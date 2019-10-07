@@ -173,6 +173,7 @@ if (OPENSSL_FOUND)
     target_link_libraries(WalletApi ${OPENSSL_LIBRARIES})
     target_link_libraries(zedwallet++ ${OPENSSL_LIBRARIES})
     target_link_libraries(WalletService ${OPENSSL_LIBRARIES})
+    target_link_libraries(TurtleCoind ${OPENSSL_LIBRARIES})
 endif ()
 
 # Add dependencies means we have to build the latter before we build the former
