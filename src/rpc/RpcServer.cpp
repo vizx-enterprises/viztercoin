@@ -267,7 +267,7 @@ namespace CryptoNote
         }
         catch (const std::exception &e)
         {
-            std::cout << "Caught exception processing RPC request: " << e.what() << std::endl;
+            logger(ERROR) << "Caught exception processing RPC request: " << e.what();
             res.status = 500;
             res.body = e.what();
             return;
