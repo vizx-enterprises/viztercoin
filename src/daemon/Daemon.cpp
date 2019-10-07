@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
 
         CryptoNote::CryptoNoteProtocolHandler cprotocol(currency, dispatcher, ccore, nullptr, logManager);
         CryptoNote::NodeServer p2psrv(dispatcher, cprotocol, logManager);
-        CryptoNote::RpcServer rpcServer(dispatcher, logManager, ccore, p2psrv, cprotocol, config.enableBlockExplorerDetailed);
+        CryptoNote::RpcServer rpcServer(logManager, ccore, p2psrv, cprotocol, config.enableBlockExplorerDetailed);
 
         cprotocol.set_p2p_endpoint(&p2psrv);
         DaemonCommandsHandler dch(ccore, p2psrv, logManager, &rpcServer);
@@ -374,10 +374,12 @@ int main(int argc, char *argv[])
 
         // Fire up the RPC Server
         logger(INFO) << "Starting core rpc server on address " << config.rpcInterface << ":" << config.rpcPort;
+
         rpcServer.setFeeAddress(config.feeAddress);
         rpcServer.setFeeAmount(config.feeAmount);
         rpcServer.enableCors(config.enableCors);
         rpcServer.start(config.rpcInterface, config.rpcPort);
+
         logger(INFO) << "Core rpc server started ok";
 
         Tools::SignalHandler::install([&dch] {

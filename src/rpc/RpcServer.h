@@ -7,9 +7,10 @@
 #pragma once
 
 #include "CoreRpcServerCommandsDefinitions.h"
-#include "HttpServer.h"
 #include "JsonRpc.h"
 #include "common/Math.h"
+#include "httplib.h"
+#include "HttpServer.h"
 
 #include <functional>
 #include <logging/LoggerRef.h>
@@ -23,18 +24,27 @@ namespace CryptoNote
 
     struct ICryptoNoteProtocolHandler;
 
-    class RpcServer : public HttpServer
+    class RpcServer
     {
       public:
         RpcServer(
-            System::Dispatcher &dispatcher,
             std::shared_ptr<Logging::ILogger> log,
             Core &c,
             NodeServer &p2p,
             ICryptoNoteProtocolHandler &protocol,
             const bool BlockExplorerDetailed);
 
-        typedef std::function<bool(RpcServer *, const HttpRequest &request, HttpResponse &response)> HandlerFunction;
+        ~RpcServer();
+
+        void start(const std::string address, const uint16_t port);
+
+        void stop();
+
+        void listen(const std::string address, const uint16_t port);
+
+        void handleRequest(const httplib::Request &request, httplib::Response &response);
+
+        typedef std::function<bool(RpcServer *, const httplib::Request &req, httplib::Response &res)> HandlerFunction;
 
         bool enableCors(const std::vector<std::string> domains);
 
@@ -58,13 +68,11 @@ namespace CryptoNote
             const bool allowBusyCore;
         };
 
-        typedef void (RpcServer::*HandlerPtr)(const HttpRequest &request, HttpResponse &response);
+        typedef void (RpcServer::*HandlerPtr)(const httplib::Request &request, httplib::Response &response);
 
         static std::unordered_map<std::string, RpcHandler<HandlerFunction>> s_handlers;
 
-        virtual void processRequest(const HttpRequest &request, HttpResponse &response) override;
-
-        bool processJsonRpcRequest(const HttpRequest &request, HttpResponse &response);
+        bool processJsonRpcRequest(const httplib::Request &request, httplib::Response &response);
 
         bool isCoreReady();
 
@@ -216,6 +224,10 @@ namespace CryptoNote
         uint32_t m_fee_amount;
         
         bool m_blockExplorerDetailed;
+
+        httplib::Server m_server;
+
+        std::thread m_serverThread;
     };
 
 } // namespace CryptoNote
