@@ -261,7 +261,17 @@ namespace CryptoNote
             return;
         }
 
-        requestHandler->second.handler(this, req, res);
+        try
+        {
+            requestHandler->second.handler(this, req, res);
+        }
+        catch (const std::exception &e)
+        {
+            std::cout << "Caught exception processing RPC request: " << e.what() << std::endl;
+            res.status = 500;
+            res.body = e.what();
+            return;
+        }
     }
 
     bool RpcServer::processJsonRpcRequest(const httplib::Request &request, httplib::Response &response)
