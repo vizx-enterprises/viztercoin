@@ -117,7 +117,7 @@ add_executable(zedwallet++ ${zedwallet++} ${ZED_WALLET_SOURCES_OS})
 
 if (MSVC)
     target_link_libraries(System ws2_32)
-    target_link_libraries(TurtleCoind Rpcrt4)
+    target_link_libraries(TurtleCoind Rpcrt4 ws2_32 advapi32 crypt32 gdi32 user32)
     target_link_libraries(WalletService Rpcrt4 ws2_32 advapi32 crypt32 gdi32 user32)
     target_link_libraries(zedwallet++ ws2_32 advapi32 crypt32 gdi32 user32)
     target_link_libraries(WalletApi ws2_32 advapi32 crypt32 gdi32 user32)
