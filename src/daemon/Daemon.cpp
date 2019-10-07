@@ -36,6 +36,7 @@
 
 #if defined(WIN32)
 
+#undef ERROR
 #include <crtdbg.h>
 #include <io.h>
 
