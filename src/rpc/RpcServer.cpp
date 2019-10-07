@@ -239,6 +239,8 @@ namespace CryptoNote
         {
             std::cout << "Could not bind service to " << address << ":" << port
                       << "\nIs another service using this address and port?\n";
+
+            exit(1);
         }
     }
 
