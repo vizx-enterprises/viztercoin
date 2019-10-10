@@ -27,7 +27,7 @@ class DaemonCommandsHandler
         CryptoNote::Core &core,
         CryptoNote::NodeServer &srv,
         std::shared_ptr<Logging::LoggerManager> log,
-        CryptoNote::RpcServer *prpc_server);
+        RpcServer *prpc_server);
 
     bool start_handling()
     {
@@ -52,8 +52,6 @@ class DaemonCommandsHandler
     Logging::LoggerRef logger;
 
     std::shared_ptr<Logging::LoggerManager> m_logManager;
-
-    CryptoNote::RpcServer *m_prpc_server;
 
     std::string get_commands_str();
 
@@ -92,4 +90,6 @@ class DaemonCommandsHandler
     bool stop_mining(const std::vector<std::string> &args);
 
     bool status(const std::vector<std::string> &args);
+
+    httplib::Client m_rpcServer;
 };

@@ -4,6 +4,7 @@
 // Please see the included LICENSE file for more information.
 
 #include "version.h"
+#include "JsonHelper.h"
 
 #include <boost/format.hpp>
 #include <cryptonotecore/Core.h>
@@ -53,12 +54,12 @@ DaemonCommandsHandler::DaemonCommandsHandler(
     CryptoNote::Core &core,
     CryptoNote::NodeServer &srv,
     std::shared_ptr<Logging::LoggerManager> log,
-    CryptoNote::RpcServer *prpc_server):
+    RpcServer *prpc_server):
     m_core(core),
     m_srv(srv),
     logger(log, "daemon"),
     m_logManager(log),
-    m_prpc_server(prpc_server)
+    m_rpcServer(std::get<0>(prpc_server->getConnectionInfo()).c_str(), std::get<1>(prpc_server->getConnectionInfo()))
 {
     m_consoleHandler.setHandler("exit", std::bind(&DaemonCommandsHandler::exit, this, std::placeholders::_1), "Shutdown the daemon");
     m_consoleHandler.setHandler("help", std::bind(&DaemonCommandsHandler::help, this, std::placeholders::_1), "Show this help");
@@ -191,12 +192,12 @@ bool DaemonCommandsHandler::print_bc(const std::vector<std::string> &args)
     req.end_height = end_index;
 
     // TODO: implement m_is_rpc handling like in monero?
-    if (!m_prpc_server->on_get_block_headers_range(req, res, error_resp) || res.status != CORE_RPC_STATUS_OK)
+    /*if (!m_prpc_server->on_get_block_headers_range(req, res, error_resp) || res.status != CORE_RPC_STATUS_OK)
     {
         // TODO res.status handling
         std::cout << "Response status not CORE_RPC_STATUS_OK" << ENDL;
         return false;
-    }
+    } TODO */
 
     const CryptoNote::Currency &currency = m_core.getCurrency();
 
@@ -411,16 +412,23 @@ bool DaemonCommandsHandler::print_pool_sh(const std::vector<std::string> &args)
 //--------------------------------------------------------------------------------
 bool DaemonCommandsHandler::status(const std::vector<std::string> &args)
 {
-    CryptoNote::COMMAND_RPC_GET_INFO::request ireq;
-    CryptoNote::COMMAND_RPC_GET_INFO::response iresp;
+    auto res = m_rpcServer.Get("/info");
 
-    if (!m_prpc_server->on_get_info(ireq, iresp) || iresp.status != CORE_RPC_STATUS_OK)
+    if (!res || res->status != 200)
     {
         std::cout << WarningMsg("Problem retrieving information from RPC server.") << std::endl;
         return false;
     }
 
-    const std::time_t uptime = std::time(nullptr) - iresp.start_time;
+    rapidjson::Document resp;
+
+    if (resp.Parse(res->body.c_str()).HasParseError())
+    {
+        std::cout << WarningMsg("Problem retrieving information from RPC server.") << std::endl;
+        return false;
+    }
+
+    const std::time_t uptime = std::time(nullptr) - getUint64FromJSON(resp, "start_time");
 
     const uint64_t seconds = uptime;
     const uint64_t minutes = seconds / 60;
@@ -432,20 +440,30 @@ bool DaemonCommandsHandler::status(const std::vector<std::string> &args)
                                 + std::to_string(minutes % 60) + "m "
                                 + std::to_string(seconds % 60) + "s";
 
-    const auto forkStatus = Utilities::get_fork_status(iresp.network_height, iresp.upgrade_heights, iresp.supported_height);
+    const uint64_t height = getUint64FromJSON(resp, "height");
+    const uint64_t networkHeight = getUint64FromJSON(resp, "network_height");
+    const uint64_t supportedHeight = getUint64FromJSON(resp, "supported_height");
+    std::vector<uint64_t> upgradeHeights;
+
+    for (const auto &height : getArrayFromJSON(resp, "upgrade_heights"))
+    {
+        upgradeHeights.push_back(height.GetUint64());
+    }
+
+    const auto forkStatus = Utilities::get_fork_status(networkHeight, upgradeHeights, supportedHeight);
 
     std::vector<std::tuple<std::string, std::string>> statusTable;
 
-    statusTable.push_back({"Local Height", std::to_string(iresp.height)});
-    statusTable.push_back({"Network Height", std::to_string(iresp.network_height)});
-    statusTable.push_back({"Percentage Synced", Utilities::get_sync_percentage(iresp.height, iresp.network_height) + "%"});
-    statusTable.push_back({"Network Hashrate", Utilities::get_mining_speed(iresp.hashrate)});
-    statusTable.push_back({"Block Version", "v" + std::to_string(iresp.major_version)});
-    statusTable.push_back({"Incoming Connections", std::to_string(iresp.incoming_connections_count)});
-    statusTable.push_back({"Outgoing Connections", std::to_string(iresp.outgoing_connections_count)});
-    statusTable.push_back({"Uptime", uptimeStr});
-    statusTable.push_back({"Fork Status", Utilities::get_update_status(forkStatus)});
-    statusTable.push_back({"Next Fork", Utilities::get_fork_time(iresp.network_height, iresp.upgrade_heights)});
+    statusTable.push_back({"Local Height",          std::to_string(height)});
+    statusTable.push_back({"Network Height",        std::to_string(networkHeight)});
+    statusTable.push_back({"Percentage Synced",     Utilities::get_sync_percentage(height, networkHeight) + "%"});
+    statusTable.push_back({"Network Hashrate",      Utilities::get_mining_speed(getUint64FromJSON(resp, "hashrate"))});
+    statusTable.push_back({"Block Version",         "v" + std::to_string(getUint64FromJSON(resp, "major_version"))});
+    statusTable.push_back({"Incoming Connections",  std::to_string(getUint64FromJSON(resp, "incoming_connections_count"))});
+    statusTable.push_back({"Outgoing Connections",  std::to_string(getUint64FromJSON(resp, "outgoing_connections_count"))});
+    statusTable.push_back({"Uptime",                uptimeStr});
+    statusTable.push_back({"Fork Status",           Utilities::get_update_status(forkStatus)});
+    statusTable.push_back({"Next Fork",             Utilities::get_fork_time(networkHeight, upgradeHeights)});
     statusTable.push_back({"Transaction Pool Size", std::to_string(m_core.getPoolTransactionHashes().size())});
 
     size_t longestValue = 0;
@@ -484,7 +502,7 @@ bool DaemonCommandsHandler::status(const std::vector<std::string> &args)
 
     if (forkStatus == Utilities::OutOfDate)
     {
-        std::cout << WarningMsg(Utilities::get_upgrade_info(iresp.supported_height, iresp.upgrade_heights)) << std::endl;
+        std::cout << WarningMsg(Utilities::get_upgrade_info(supportedHeight, upgradeHeights)) << std::endl;
     }
 
     return true;

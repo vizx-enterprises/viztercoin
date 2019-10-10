@@ -96,6 +96,10 @@ namespace Logger
             {
                 return "Daemon";
             }
+            case DAEMON_RPC:
+            {
+                return "Daemon RPC";
+            }
         }
 
         throw std::invalid_argument("Invalid log category given");
