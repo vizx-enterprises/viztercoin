@@ -10,6 +10,7 @@
 
 #include "version.h"
 
+#include <errors/ValidateParameters.h>
 #include <logger/Logger.h>
 #include <utilities/ColouredMsg.h>
 
@@ -33,6 +34,17 @@ RpcServer::RpcServer(
     m_p2p(p2p),
     m_syncManager(syncManager)
 {
+    if (m_feeAddress != "")
+    {
+        Error error = validateAddresses({m_feeAddress}, false);
+
+        if (error != SUCCESS)
+        {
+            std::cout << WarningMsg("Fee address given is not valid: " + error.getErrorMessage()) << std::endl;
+            exit(1);
+        }
+    }
+
     /* Route the request through our middleware function, before forwarding
        to the specified function */
     const auto router = [this](const auto function, const RpcMode routePermissions) {
@@ -335,6 +347,24 @@ std::tuple<Error, uint16_t> RpcServer::fee(
     httplib::Response &res,
     const rapidjson::Document &body)
 {
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("address");
+    writer.String(m_feeAddress);
+
+    writer.Key("amount");
+    writer.Uint64(m_feeAmount);
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
     return {SUCCESS, 200};
 }
 
