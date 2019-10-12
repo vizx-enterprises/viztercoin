@@ -373,6 +373,24 @@ std::tuple<Error, uint16_t> RpcServer::height(
     httplib::Response &res,
     const rapidjson::Document &body)
 {
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("height");
+    writer.Uint64(m_core->getTopBlockIndex() + 1);
+
+    writer.Key("network_height");
+    writer.Uint64(std::max(1u, m_syncManager->getBlockchainHeight()));
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
     return {SUCCESS, 200};
 }
 
