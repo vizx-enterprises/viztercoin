@@ -399,5 +399,46 @@ std::tuple<Error, uint16_t> RpcServer::peers(
     httplib::Response &res,
     const rapidjson::Document &body)
 {
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    std::list<PeerlistEntry> peers_white;
+    std::list<PeerlistEntry> peers_gray;
+
+    m_p2p->getPeerlistManager().get_peerlist_full(peers_gray, peers_white);
+
+    writer.Key("peers");
+    writer.StartArray();
+    {
+        for (const auto &peer : peers_white)
+        {
+            std::stringstream stream;
+            stream << peer.adr;
+            writer.String(stream.str());
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("peers_gray");
+    writer.StartArray();
+    {
+        for (const auto &peer : peers_gray)
+        {
+            std::stringstream stream;
+            stream << peer.adr;
+            writer.String(stream.str());
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
     return {SUCCESS, 200};
 }
