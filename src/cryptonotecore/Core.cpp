@@ -1567,7 +1567,7 @@ namespace CryptoNote
         return found;
     }
 
-    bool Core::getRandomOutputs(
+    std::tuple<bool, std::string> Core::getRandomOutputs(
         uint64_t amount,
         uint16_t count,
         std::vector<uint32_t> &globalIndexes,
@@ -1577,25 +1577,36 @@ namespace CryptoNote
 
         if (count == 0)
         {
-            return true;
+            return {true, ""};
         }
 
         auto upperBlockLimit = getTopBlockIndex() - currency.minedMoneyUnlockWindow();
+
         if (upperBlockLimit < currency.minedMoneyUnlockWindow())
         {
-            logger(Logging::DEBUGGING) << "Blockchain height is less than mined unlock window";
-            return false;
+            std::string error = "Blockchain height is less than mined unlock window";
+            logger(Logging::DEBUGGING) << error;
+
+            return {false, error};
         }
 
         globalIndexes = chainsLeaves[0]->getRandomOutsByAmount(amount, count, getTopBlockIndex());
+
         if (globalIndexes.empty())
         {
-            logger(Logging::ERROR) << "Failed to get any matching outputs for amount " << amount << " ("
-                                   << Utilities::formatAmount(amount) << "). Further explanation here: "
-                                   << "https://gist.github.com/zpalmtree/80b3e80463225bcfb8f8432043cb594c\n"
-                                   << "Note: If you are a public node operator, you can safely ignore this message. "
-                                   << "It is only relevant to the user sending the transaction.";
-            return false;
+            std::stringstream stream;
+
+            stream << "Failed to get any matching outputs for amount " << amount << " ("
+                   << Utilities::formatAmount(amount) << "). Further explanation here: "
+                   << "https://gist.github.com/zpalmtree/80b3e80463225bcfb8f8432043cb594c\n"
+                   << "Note: If you are a public node operator, you can safely ignore this message. "
+                   << "It is only relevant to the user sending the transaction.";
+
+            std::string error = stream.str();
+
+            logger(Logging::ERROR) << error;
+
+            return {false, error};
         }
 
         std::sort(globalIndexes.begin(), globalIndexes.end());
@@ -1604,16 +1615,30 @@ namespace CryptoNote
             amount, getTopBlockIndex(), {globalIndexes.data(), globalIndexes.size()}, publicKeys))
         {
             case ExtractOutputKeysResult::SUCCESS:
-                return true;
+            {
+                return {true, ""};
+            }
             case ExtractOutputKeysResult::INVALID_GLOBAL_INDEX:
-                logger(Logging::DEBUGGING) << "Invalid global index is given";
-                return false;
-            case ExtractOutputKeysResult::OUTPUT_LOCKED:
-                logger(Logging::DEBUGGING) << "Output is locked";
-                return false;
-        }
+            {
+                std::string error = "Invalid global index is given";
 
-        return false;
+                logger(Logging::DEBUGGING) << error;
+
+                return {false, error};
+            }
+            case ExtractOutputKeysResult::OUTPUT_LOCKED:
+            {
+                std::string error = "Output is locked";
+
+                logger(Logging::DEBUGGING) << error;
+
+                return {false, error};
+            }
+            default:
+            {
+                return {false, "Unknown error"};
+            }
+        }
     }
 
     bool Core::getGlobalIndexesForRange(

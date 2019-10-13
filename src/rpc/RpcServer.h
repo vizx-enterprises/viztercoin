@@ -108,6 +108,9 @@ class RpcServer
     std::tuple<Error, uint16_t>
         sendTransaction(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    std::tuple<Error, uint16_t>
+        getRandomOuts(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
     //////////////////////////////
     /* Private member variables */
     //////////////////////////////

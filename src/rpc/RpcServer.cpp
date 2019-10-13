@@ -13,6 +13,7 @@
 #include <errors/ValidateParameters.h>
 #include <logger/Logger.h>
 #include <utilities/ColouredMsg.h>
+#include <utilities/FormatTools.h>
 
 RpcServer::RpcServer(
     const uint16_t bindPort,
@@ -70,6 +71,7 @@ RpcServer::RpcServer(
             .Get("/peers", router(&RpcServer::peers, RpcMode::Default, bodyNotRequired))
 
             .Post("/sendrawtransaction", router(&RpcServer::sendTransaction, RpcMode::Default, bodyRequired))
+            .Post("/getrandom_outs", router(&RpcServer::getRandomOuts, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -197,6 +199,8 @@ void RpcServer::middleware(
 
             writer.Key("errorMessage");
             writer.String(error.getErrorMessage());
+
+            writer.EndObject();
 
             res.set_content(sb.GetString(), "application/json");
             res.status = 400;
@@ -555,5 +559,90 @@ std::tuple<Error, uint16_t> RpcServer::sendTransaction(
 
     res.set_content(sb.GetString(), "application/json");
     
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getRandomOuts(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    const uint64_t numOutputs = getUint64FromJSON(body, "outs_count");
+
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("outs");
+
+    writer.StartArray();
+    {
+        for (const auto &jsonAmount : getArrayFromJSON(body, "amounts"))
+        {
+            writer.StartObject();
+
+            const uint64_t amount = jsonAmount.GetUint64();
+
+            std::vector<uint32_t> globalIndexes;
+            std::vector<Crypto::PublicKey> publicKeys;
+
+            const auto [success, error] = m_core->getRandomOutputs(
+                amount, static_cast<uint16_t>(numOutputs), globalIndexes, publicKeys
+            );
+
+            if (!success)
+            {
+                return {Error(CANT_GET_FAKE_OUTPUTS, error), 200};
+            }
+
+            if (globalIndexes.size() != numOutputs)
+            {
+                std::stringstream stream;
+
+                stream << "Failed to get enough matching outputs for amount " << amount << " ("
+                       << Utilities::formatAmount(amount) << "). Requested outputs: " << numOutputs
+                       << ", found outputs: " << globalIndexes.size()
+                       << ". Further explanation here: https://gist.github.com/zpalmtree/80b3e80463225bcfb8f8432043cb594c"
+                       << std::endl
+                       << "Note: If you are a public node operator, you can safely ignore this message. "
+                       << "It is only relevant to the user sending the transaction.";
+
+                return {Error(CANT_GET_FAKE_OUTPUTS, stream.str()), 200};
+            }
+
+            writer.Key("amount");
+            writer.Uint64(amount);
+
+            writer.Key("outs");
+            writer.StartArray();
+            {
+                for (size_t i = 0; i < globalIndexes.size(); i++)
+                {
+                    writer.StartObject();
+                    {
+                        writer.Key("global_amount_index");
+                        writer.Uint64(globalIndexes[i]);
+
+                        writer.Key("out_key");
+                        writer.String(Common::podToHex(publicKeys[i]));
+                    }
+                    writer.EndObject();
+                }
+            }
+            writer.EndArray();
+
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
     return {SUCCESS, 200};
 }

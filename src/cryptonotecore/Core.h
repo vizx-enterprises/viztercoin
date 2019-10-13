@@ -140,7 +140,7 @@ namespace CryptoNote
             const Crypto::Hash &transactionHash,
             std::vector<uint32_t> &globalIndexes) const override;
 
-        virtual bool getRandomOutputs(
+        virtual std::tuple<bool, std::string> getRandomOutputs(
             uint64_t amount,
             uint16_t count,
             std::vector<uint32_t> &globalIndexes,
