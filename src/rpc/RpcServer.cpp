@@ -72,6 +72,7 @@ RpcServer::RpcServer(
 
             .Post("/sendrawtransaction", router(&RpcServer::sendTransaction, RpcMode::Default, bodyRequired))
             .Post("/getrandom_outs", router(&RpcServer::getRandomOuts, RpcMode::Default, bodyRequired))
+            .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -636,6 +637,218 @@ std::tuple<Error, uint16_t> RpcServer::getRandomOuts(
         }
     }
     writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getWalletSyncData(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    std::vector<Crypto::Hash> blockHashCheckpoints;
+
+    if (hasMember(body, "blockHashCheckpoints"))
+    {
+        for (const auto &jsonHash : getArrayFromJSON(body, "blockHashCheckpoints"))
+        {
+            std::string hashStr = jsonHash.GetString();
+
+            Crypto::Hash hash;
+            Common::podFromHex(hashStr, hash);
+
+            blockHashCheckpoints.push_back(hash);
+        }
+    }
+
+    const uint64_t startHeight = hasMember(body, "startHeight")
+        ? getUint64FromJSON(body, "startHeight")
+        : 0;
+
+    const uint64_t startTimestamp = hasMember(body, "startTimestamp")
+        ? getUint64FromJSON(body, "startTimestamp")
+        : 0;
+
+    const uint64_t blockCount = hasMember(body, "blockCount")
+        ? getUint64FromJSON(body, "blockCount")
+        : 100;
+
+    const bool skipCoinbaseTransactions = hasMember(body, "skipCoinbaseTransactions")
+        ? getBoolFromJSON(body, "skipCoinbaseTransactions")
+        : false;
+
+    std::vector<WalletTypes::WalletBlockInfo> walletBlocks;
+    std::optional<WalletTypes::TopBlock> topBlockInfo;
+
+    const bool success = m_core->getWalletSyncData(
+        blockHashCheckpoints,
+        startHeight,
+        startTimestamp,
+        blockCount,
+        skipCoinbaseTransactions,
+        walletBlocks,
+        topBlockInfo
+    );
+
+    if (!success)
+    {
+        return {SUCCESS, 500};
+    }
+
+    writer.Key("items");
+    writer.StartArray();
+    {
+        for (const auto &block : walletBlocks)
+        {
+            writer.StartObject();
+
+            if (block.coinbaseTransaction)
+            {
+                writer.Key("coinbaseTX");
+                writer.StartObject();
+                {
+                    writer.Key("outputs");
+                    writer.StartArray();
+                    {
+                        for (const auto &output : block.coinbaseTransaction->keyOutputs)
+                        {
+                            writer.StartObject();
+                            {
+                                writer.Key("key");
+                                writer.String(Common::podToHex(output.key));
+
+                                writer.Key("amount");
+                                writer.Uint64(output.amount);
+                            }
+                            writer.EndObject();
+                        }
+                    }
+                    writer.EndArray();
+
+                    writer.Key("hash");
+                    writer.String(Common::podToHex(block.coinbaseTransaction->hash));
+
+                    writer.Key("txPublicKey");
+                    writer.String(Common::podToHex(block.coinbaseTransaction->transactionPublicKey));
+
+                    writer.Key("unlockTime");
+                    writer.Uint64(block.coinbaseTransaction->unlockTime);
+                }
+                writer.EndObject();
+            }
+
+            writer.Key("transactions");
+            writer.StartArray();
+            {
+                for (const auto &transaction : block.transactions)
+                {
+                    writer.StartObject();
+                    {
+                        writer.Key("outputs");
+                        writer.StartArray();
+                        {
+                            for (const auto &output : transaction.keyOutputs)
+                            {
+                                writer.StartObject();
+                                {
+                                    writer.Key("key");
+                                    writer.String(Common::podToHex(output.key));
+
+                                    writer.Key("amount");
+                                    writer.Uint64(output.amount);
+                                }
+                                writer.EndObject();
+                            }
+                        }
+                        writer.EndArray();
+
+                        writer.Key("hash");
+                        writer.String(Common::podToHex(transaction.hash));
+
+                        writer.Key("txPublicKey");
+                        writer.String(Common::podToHex(transaction.transactionPublicKey));
+
+                        writer.Key("unlockTime");
+                        writer.Uint64(transaction.unlockTime);
+
+                        writer.Key("paymentID");
+                        writer.String(transaction.paymentID);
+
+                        writer.Key("inputs");
+                        writer.StartArray();
+                        {
+                            for (const auto &input : transaction.keyInputs)
+                            {
+                                writer.StartObject();
+                                {
+                                    writer.Key("amount");
+                                    writer.Uint64(input.amount);
+
+                                    writer.Key("key_offsets");
+                                    writer.StartArray();
+                                    {
+                                        for (const auto &offset : input.outputIndexes)
+                                        {
+                                            writer.Uint64(offset);
+                                        }
+                                    }
+                                    writer.EndArray();
+
+                                    writer.Key("k_image");
+                                    writer.String(Common::podToHex(input.keyImage));
+                                }
+                                writer.EndObject();
+                            }
+                        }
+                        writer.EndArray();
+                    }
+                    writer.EndObject();
+                }
+            }
+            writer.EndArray();
+
+            writer.Key("blockHeight");
+            writer.Uint64(block.blockHeight);
+
+            writer.Key("blockHash");
+            writer.String(Common::podToHex(block.blockHash));
+
+            writer.Key("blockTimestamp");
+            writer.Uint64(block.blockTimestamp);
+
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    if (topBlockInfo)
+    {
+        writer.Key("topBlock");
+        writer.StartObject();
+        {
+            writer.Key("hash");
+            writer.String(Common::podToHex(topBlockInfo->hash));
+
+            writer.Key("height");
+            writer.Uint64(topBlockInfo->height);
+        }
+        writer.EndObject();
+    }
+
+    writer.Key("synced");
+    writer.Bool(walletBlocks.empty());
 
     writer.Key("status");
     writer.String("OK");
