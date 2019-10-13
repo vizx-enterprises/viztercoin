@@ -23,7 +23,7 @@ RpcServer::RpcServer(
     const RpcMode rpcMode,
     const std::shared_ptr<CryptoNote::Core> core,
     const std::shared_ptr<CryptoNote::NodeServer> p2p,
-    const std::shared_ptr<CryptoNote::CryptoNoteProtocolHandler> syncManager):
+    const std::shared_ptr<CryptoNote::ICryptoNoteProtocolHandler> syncManager):
     m_port(bindPort),
     m_host(rpcBindIp),
     m_corsHeader(corsHeader),
@@ -47,7 +47,7 @@ RpcServer::RpcServer(
 
     /* Route the request through our middleware function, before forwarding
        to the specified function */
-    const auto router = [this](const auto function, const RpcMode routePermissions) {
+    const auto router = [this](const auto function, const RpcMode routePermissions, const bool bodyRequired) {
         return [=](const httplib::Request &req, httplib::Response &res) {
             /* Pass the inputted function with the arguments passed through
                to middleware */
@@ -55,15 +55,21 @@ RpcServer::RpcServer(
                 req,
                 res,
                 routePermissions,
+                bodyRequired,
                 std::bind(function, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)
             );
         };
     };
 
-    m_server.Get("/info", router(&RpcServer::info, RpcMode::Default))
-            .Get("/fee", router(&RpcServer::fee, RpcMode::Default))
-            .Get("/height", router(&RpcServer::height, RpcMode::Default))
-            .Get("/peers", router(&RpcServer::peers, RpcMode::Default))
+    const bool bodyRequired = true;
+    const bool bodyNotRequired = false;
+
+    m_server.Get("/info", router(&RpcServer::info, RpcMode::Default, bodyNotRequired))
+            .Get("/fee", router(&RpcServer::fee, RpcMode::Default, bodyNotRequired))
+            .Get("/height", router(&RpcServer::height, RpcMode::Default, bodyNotRequired))
+            .Get("/peers", router(&RpcServer::peers, RpcMode::Default, bodyNotRequired))
+
+            .Post("/sendrawtransaction", router(&RpcServer::sendTransaction, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -111,6 +117,7 @@ void RpcServer::middleware(
     const httplib::Request &req,
     httplib::Response &res,
     const RpcMode routePermissions,
+    const bool bodyRequired,
     std::function<std::tuple<Error, uint16_t>(
         const httplib::Request &req,
         httplib::Response &res,
@@ -124,25 +131,33 @@ void RpcServer::middleware(
         { Logger::DAEMON_RPC }
     );
 
-    /* Not necessarily an error if a body isn't needed */
-    if (jsonBody.Parse(req.body.c_str()).HasParseError())
+    if (m_corsHeader != "")
     {
+        res.set_header("Access-Control-Allow-Origin", m_corsHeader);
+    }
+
+    if (bodyRequired && jsonBody.Parse(req.body.c_str()).HasParseError())
+    {
+        std::stringstream stream;
+
         if (!req.body.empty())
         {
-            /* TODO: Set logger callback in daemon.cpp */
+            stream << "Warning: received body is not JSON encoded!\n"
+                   << "Key/value parameters are NOT supported.\n"
+                   << "Body:\n" << req.body;
+
             Logger::logger.log(
-                "Warning: received body is not JSON encoded!\n"
-                "Key/value parameters are NOT supported.\n"
-                "Body:\n" + req.body,
+                stream.str(),
                 Logger::INFO,
                 { Logger::DAEMON_RPC }
             );
         }
-    }
 
-    if (m_corsHeader != "")
-    {
-        res.set_header("Access-Control-Allow-Origin", m_corsHeader);
+        stream << "Failed to parse request body as JSON";
+
+        failRequest(400, stream.str(), res);
+
+        return;
     }
 
     /* If this route requires higher permissions than we have enabled, then
@@ -161,8 +176,7 @@ void RpcServer::middleware(
 
         stream << " command line option to access this method.";
 
-        res.set_content(stream.str(), "text/plain");
-        res.status = 403;
+        failRequest(403, stream.str(), res);
 
         return;
     }
@@ -191,6 +205,8 @@ void RpcServer::middleware(
         {
             res.status = statusCode;
         }
+
+        return;
     }
     catch (const std::invalid_argument &e)
     {
@@ -200,7 +216,7 @@ void RpcServer::middleware(
             { Logger::DAEMON_RPC }
         );
 
-        res.status = 400;
+        failRequest(400, e.what(), res);
     }
     catch (const std::exception &e)
     {
@@ -210,8 +226,27 @@ void RpcServer::middleware(
             { Logger::DAEMON_RPC }
         );
 
-        res.status = 500;
+        failRequest(500, "Internal server error: " + std::string(e.what()), res);
     }
+}
+
+void RpcServer::failRequest(uint16_t port, std::string body, httplib::Response &res)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("status");
+    writer.String("Failed");
+
+    writer.Key("error");
+    writer.String(body);
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+    res.status = port;
 }
 
 void RpcServer::handleOptions(const httplib::Request &req, httplib::Response &res) const
@@ -440,5 +475,85 @@ std::tuple<Error, uint16_t> RpcServer::peers(
 
     res.set_content(sb.GetString(), "application/json");
 
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::sendTransaction(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    std::vector<uint8_t> transaction;
+
+    const std::string rawData = getStringFromJSON(body, "tx_as_hex");
+
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    if (!Common::fromHex(rawData, transaction))
+    {
+        writer.Key("status");
+        writer.String("Failed");
+
+        writer.Key("error");
+        writer.String("Failed to parse transaction from hex buffer");
+    }
+    else
+    {
+        Crypto::Hash transactionHash = Crypto::cn_fast_hash(transaction.data(), transaction.size());
+
+        writer.Key("transactionHash");
+        writer.String(Common::podToHex(transactionHash));
+
+        std::stringstream stream;
+
+        stream << "Attempting to add transaction " << transactionHash << " from /sendrawtransaction to pool";
+
+        Logger::logger.log(
+            stream.str(),
+            Logger::DEBUG,
+            { Logger::DAEMON_RPC }
+        );
+
+        const auto [success, error] = m_core->addTransactionToPool(transaction);
+
+        if (!success)
+        {
+            /* Empty stream */
+            std::stringstream().swap(stream);
+
+            stream << "Failed to add transaction " << transactionHash << " from /sendrawtransaction to pool: " << error;
+
+            Logger::logger.log(
+                stream.str(),
+                Logger::INFO,
+                { Logger::DAEMON_RPC }
+            );
+
+            writer.Key("status");
+            writer.String("Failed");
+
+            writer.Key("error");
+            writer.String(error);
+        }
+        else
+        {
+            m_syncManager->relayTransactions({transaction});
+
+            writer.Key("status");
+            writer.String("OK");
+
+            writer.Key("error");
+            writer.String("");
+
+        }
+    }
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+    
     return {SUCCESS, 200};
 }

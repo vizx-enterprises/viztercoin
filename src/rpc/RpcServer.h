@@ -41,7 +41,7 @@ class RpcServer
         const RpcMode rpcMode,
         const std::shared_ptr<CryptoNote::Core> core,
         const std::shared_ptr<CryptoNote::NodeServer> p2p,
-        const std::shared_ptr<CryptoNote::CryptoNoteProtocolHandler> syncManager);
+        const std::shared_ptr<CryptoNote::ICryptoNoteProtocolHandler> syncManager);
 
     ~RpcServer();
 
@@ -71,10 +71,13 @@ class RpcServer
         const httplib::Request &req,
         httplib::Response &res,
         const RpcMode routePermissions,
+        const bool bodyRequired,
         std::function<std::tuple<Error, uint16_t>(
             const httplib::Request &req,
             httplib::Response &res,
             const rapidjson::Document &body)> handler);
+
+    void failRequest(uint16_t port, std::string body, httplib::Response &res);
 
     /////////////////////
     /* OPTION REQUESTS */
@@ -97,6 +100,13 @@ class RpcServer
 
     std::tuple<Error, uint16_t>
         peers(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
+    ///////////////////
+    /* POST REQUESTS */
+    ///////////////////
+
+    std::tuple<Error, uint16_t>
+        sendTransaction(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
     //////////////////////////////
     /* Private member variables */
@@ -133,5 +143,5 @@ class RpcServer
     /* A pointer to our P2P stack */
     const std::shared_ptr<CryptoNote::NodeServer> m_p2p;
 
-    const std::shared_ptr<CryptoNote::CryptoNoteProtocolHandler> m_syncManager;
+    const std::shared_ptr<CryptoNote::ICryptoNoteProtocolHandler> m_syncManager;
 };
