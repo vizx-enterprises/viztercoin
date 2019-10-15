@@ -73,6 +73,7 @@ RpcServer::RpcServer(
             .Post("/sendrawtransaction", router(&RpcServer::sendTransaction, RpcMode::Default, bodyRequired))
             .Post("/getrandom_outs", router(&RpcServer::getRandomOuts, RpcMode::Default, bodyRequired))
             .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
+            .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -849,6 +850,69 @@ std::tuple<Error, uint16_t> RpcServer::getWalletSyncData(
 
     writer.Key("synced");
     writer.Bool(walletBlocks.empty());
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getGlobalIndexes(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const uint64_t startHeight = getUint64FromJSON(body, "startHeight");
+    const uint64_t endHeight = getUint64FromJSON(body, "endHeight");
+
+    std::unordered_map<Crypto::Hash, std::vector<uint64_t>> indexes;
+
+    const bool success = m_core->getGlobalIndexesForRange(startHeight, endHeight, indexes);
+
+    writer.StartObject();
+
+    if (!success)
+    {
+        writer.Key("status");
+        writer.String("Failed");
+
+        res.set_content(sb.GetString(), "application/json");
+
+        return {SUCCESS, 500};
+    }
+
+    writer.Key("indexes");
+
+    writer.StartArray();
+    {
+        for (const auto [hash, globalIndexes] : indexes)
+        {
+            writer.StartObject();
+
+            writer.Key("key");
+            writer.String(Common::podToHex(hash));
+            
+            writer.Key("value");
+            writer.StartArray();
+            {
+                for (const auto index : globalIndexes)
+                {
+                    writer.Uint64(index);
+                }
+            }
+            writer.EndArray();
+
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
 
     writer.Key("status");
     writer.String("OK");
