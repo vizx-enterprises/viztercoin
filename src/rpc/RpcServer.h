@@ -66,6 +66,11 @@ class RpcServer
     /* Starts listening for requests on the server */
     void listen();
 
+    std::optional<rapidjson::Document> getJsonBody(
+        const httplib::Request &req,
+        httplib::Response &res,
+        const bool bodyRequired);
+
     /* Handles stuff like parsing json and then forwards onto the handler */
     void middleware(
         const httplib::Request &req,
@@ -77,7 +82,12 @@ class RpcServer
             httplib::Response &res,
             const rapidjson::Document &body)> handler);
 
-    void failRequest(uint16_t port, std::string body, httplib::Response &res);
+    void failRequest(uint16_t statusCode, std::string body, httplib::Response &res);
+
+    void failJsonRpcRequest(
+        const uint64_t errorCode,
+        const std::string errorMessage,
+        httplib::Response &res);
 
     /////////////////////
     /* OPTION REQUESTS */
@@ -116,6 +126,9 @@ class RpcServer
 
     std::tuple<Error, uint16_t>
         getGlobalIndexes(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
+    std::tuple<Error, uint16_t>
+        getBlockTemplate(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
     //////////////////////////////
     /* Private member variables */

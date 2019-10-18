@@ -169,9 +169,10 @@ namespace CryptoNote
             std::vector<TransactionPrefixInfo> &addedTransactions,
             std::vector<Crypto::Hash> &deletedTransactions) const override;
 
-        virtual bool getBlockTemplate(
+        virtual std::tuple<bool, std::string> getBlockTemplate(
             BlockTemplate &b,
-            const AccountPublicAddress &adr,
+            const Crypto::PublicKey &publicViewKey,
+            const Crypto::PublicKey &publicSpendKey,
             const BinaryArray &extraNonce,
             uint64_t &difficulty,
             uint32_t &height) const override;

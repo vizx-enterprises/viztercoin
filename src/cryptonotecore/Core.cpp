@@ -1856,9 +1856,10 @@ namespace CryptoNote
         return getTopBlockHash() == lastBlockHash;
     }
 
-    bool Core::getBlockTemplate(
+    std::tuple<bool, std::string> Core::getBlockTemplate(
         BlockTemplate &b,
-        const AccountPublicAddress &adr,
+        const Crypto::PublicKey &publicViewKey,
+        const Crypto::PublicKey &publicSpendKey,
         const BinaryArray &extraNonce,
         uint64_t &difficulty,
         uint32_t &height) const
@@ -1867,10 +1868,14 @@ namespace CryptoNote
 
         height = getTopBlockIndex() + 1;
         difficulty = getDifficultyForNextBlock();
+
         if (difficulty == 0)
         {
-            logger(Logging::ERROR, Logging::BRIGHT_RED) << "difficulty overhead.";
-            return false;
+            std::string error = "Cannot create block template, difficulty is zero. Oh shit, you fucked up hard!";
+
+            logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+            return {false, error};
         }
 
         b = boost::value_initialized<BlockTemplate>();
@@ -1899,11 +1904,14 @@ namespace CryptoNote
             b.parentBlock.transactionCount = 1;
 
             TransactionExtraMergeMiningTag mmTag = boost::value_initialized<decltype(mmTag)>();
+
             if (!appendMergeMiningTagToExtra(b.parentBlock.baseTransaction.extra, mmTag))
             {
-                logger(Logging::ERROR, Logging::BRIGHT_RED)
-                    << "Failed to append merge mining tag to extra of the parent block miner transaction";
-                return false;
+                std::string error = "Failed to append merge mining tag to extra of the parent block miner transaction";
+
+                logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+                return {false, error};
             }
         }
 
@@ -1984,14 +1992,19 @@ namespace CryptoNote
             alreadyGeneratedCoins,
             transactionsSize,
             fee,
-            adr,
+            publicViewKey,
+            publicSpendKey,
             b.baseTransaction,
             extraNonce,
             11);
+
         if (!r)
         {
-            logger(Logging::ERROR, Logging::BRIGHT_RED) << "Failed to construct miner tx, first chance";
-            return false;
+            std::string error = "Failed to construct miner transaction";
+
+            logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+            return {false, error};
         }
 
         size_t cumulativeSize = transactionsSize + getObjectBinarySize(b.baseTransaction);
@@ -2005,14 +2018,19 @@ namespace CryptoNote
                 alreadyGeneratedCoins,
                 cumulativeSize,
                 fee,
-                adr,
+                publicViewKey,
+                publicSpendKey,
                 b.baseTransaction,
                 extraNonce,
                 11);
+
             if (!r)
             {
-                logger(Logging::ERROR, Logging::BRIGHT_RED) << "Failed to construct miner tx, second chance";
-                return false;
+                std::string error = "Failed to construct miner transaction";
+
+                logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+                return {false, error};
             }
 
             size_t coinbaseBlobSize = getObjectBinarySize(b.baseTransaction);
@@ -2032,11 +2050,17 @@ namespace CryptoNote
                 {
                     if (!(cumulativeSize + 1 == transactionsSize + getObjectBinarySize(b.baseTransaction)))
                     {
-                        logger(Logging::ERROR, Logging::BRIGHT_RED)
-                            << "unexpected case: cumulative_size=" << cumulativeSize
-                            << " + 1 is not equal txs_cumulative_size=" << transactionsSize
-                            << " + get_object_blobsize(b.baseTransaction)=" << getObjectBinarySize(b.baseTransaction);
-                        return false;
+                        std::stringstream stream;
+
+                        stream << "unexpected case: cumulative_size=" << cumulativeSize
+                               << " + 1 is not equal txs_cumulative_size=" << transactionsSize
+                               << " + get_object_blobsize(b.baseTransaction)=" << getObjectBinarySize(b.baseTransaction);
+
+                        std::string error = stream.str();
+
+                        logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+                        return {false, error};
                     }
 
                     b.baseTransaction.extra.resize(b.baseTransaction.extra.size() - 1);
@@ -2057,19 +2081,27 @@ namespace CryptoNote
             }
             if (!(cumulativeSize == transactionsSize + getObjectBinarySize(b.baseTransaction)))
             {
-                logger(Logging::ERROR, Logging::BRIGHT_RED)
-                    << "unexpected case: cumulative_size=" << cumulativeSize
-                    << " is not equal txs_cumulative_size=" << transactionsSize
-                    << " + get_object_blobsize(b.baseTransaction)=" << getObjectBinarySize(b.baseTransaction);
-                return false;
+                std::stringstream stream;
+
+                stream << "unexpected case: cumulative_size=" << cumulativeSize
+                       << " is not equal txs_cumulative_size=" << transactionsSize
+                       << " + get_object_blobsize(b.baseTransaction)=" << getObjectBinarySize(b.baseTransaction);
+
+                std::string error = stream.str();
+
+                logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+                return {false, error};
             }
 
-            return true;
+            return {true, std::string()};
         }
 
-        logger(Logging::ERROR, Logging::BRIGHT_RED)
-            << "Failed to create_block_template with " << TRIES_COUNT << " tries";
-        return false;
+        std::string error = "Failed to create block template";
+
+        logger(Logging::ERROR, Logging::BRIGHT_RED) << error;
+
+        return {false, error};
     }
 
     CoreStatistics Core::getCoreStatistics() const

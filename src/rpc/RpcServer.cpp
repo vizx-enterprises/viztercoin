@@ -12,8 +12,11 @@
 
 #include <errors/ValidateParameters.h>
 #include <logger/Logger.h>
+#include <serialization/SerializationTools.h>
+#include <utilities/Addresses.h>
 #include <utilities/ColouredMsg.h>
 #include <utilities/FormatTools.h>
+#include <utilities/ParseExtra.h>
 
 RpcServer::RpcServer(
     const uint16_t bindPort,
@@ -75,6 +78,32 @@ RpcServer::RpcServer(
             .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
             .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
 
+            .Post("/json_rpc", [this, router](auto &req, auto &res) {
+                const auto body = getJsonBody(req, res, true);
+
+                if (!body)
+                {
+                    return;
+                }
+
+                if (!hasMember(*body, "method"))
+                {
+                    failRequest(400, "Missing JSON parameter: 'method'", res);
+                    return;
+                }
+
+                const auto method = getStringFromJSON(*body, "method");
+
+                if (method == "getblocktemplate")
+                {
+                    router(&RpcServer::getBlockTemplate, RpcMode::Default, bodyRequired)(req, res);
+                }
+                else
+                {
+                    res.status = 404;
+                }
+            })
+
             /* Matches everything */
             /* NOTE: Not passing through middleware */
             .Options(".*", [this](auto &req, auto &res) { handleOptions(req, res); });
@@ -117,30 +146,19 @@ std::tuple<std::string, uint16_t> RpcServer::getConnectionInfo()
     return {m_host, m_port};
 }
 
-void RpcServer::middleware(
+std::optional<rapidjson::Document> RpcServer::getJsonBody(
     const httplib::Request &req,
     httplib::Response &res,
-    const RpcMode routePermissions,
-    const bool bodyRequired,
-    std::function<std::tuple<Error, uint16_t>(
-        const httplib::Request &req,
-        httplib::Response &res,
-        const rapidjson::Document &body)> handler)
+    const bool bodyRequired)
 {
     rapidjson::Document jsonBody;
 
-    Logger::logger.log(
-        "Incoming " + req.method + " request: " + req.path,
-        Logger::DEBUG,
-        { Logger::DAEMON_RPC }
-    );
-
-    if (m_corsHeader != "")
+    if (!bodyRequired)
     {
-        res.set_header("Access-Control-Allow-Origin", m_corsHeader);
+        return jsonBody;
     }
 
-    if (bodyRequired && jsonBody.Parse(req.body.c_str()).HasParseError())
+    if (jsonBody.Parse(req.body.c_str()).HasParseError())
     {
         std::stringstream stream;
 
@@ -161,6 +179,37 @@ void RpcServer::middleware(
 
         failRequest(400, stream.str(), res);
 
+        return std::nullopt;
+    }
+
+    return jsonBody;
+}
+
+void RpcServer::middleware(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const RpcMode routePermissions,
+    const bool bodyRequired,
+    std::function<std::tuple<Error, uint16_t>(
+        const httplib::Request &req,
+        httplib::Response &res,
+        const rapidjson::Document &body)> handler)
+{
+    Logger::logger.log(
+        "Incoming " + req.method + " request: " + req.path,
+        Logger::DEBUG,
+        { Logger::DAEMON_RPC }
+    );
+
+    if (m_corsHeader != "")
+    {
+        res.set_header("Access-Control-Allow-Origin", m_corsHeader);
+    }
+    
+    const auto jsonBody = getJsonBody(req, res, bodyRequired);
+
+    if (!jsonBody)
+    {
         return;
     }
 
@@ -187,7 +236,7 @@ void RpcServer::middleware(
 
     try
     {
-        const auto [error, statusCode] = handler(req, res, jsonBody);
+        const auto [error, statusCode] = handler(req, res, *jsonBody);
 
         if (error)
         {
@@ -236,7 +285,7 @@ void RpcServer::middleware(
     }
 }
 
-void RpcServer::failRequest(uint16_t port, std::string body, httplib::Response &res)
+void RpcServer::failRequest(uint16_t statusCode, std::string body, httplib::Response &res)
 {
     rapidjson::StringBuffer sb;
     rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
@@ -252,7 +301,37 @@ void RpcServer::failRequest(uint16_t port, std::string body, httplib::Response &
     writer.EndObject();
 
     res.set_content(sb.GetString(), "application/json");
-    res.status = port;
+    res.status = statusCode;
+}
+
+void RpcServer::failJsonRpcRequest(
+    const uint64_t errorCode,
+    const std::string errorMessage,
+    httplib::Response &res)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+    {
+        writer.Key("jsonrpc");
+        writer.String("2.0");
+
+        writer.Key("error");
+        writer.StartObject();
+        {
+            writer.Key("message");
+            writer.String(errorMessage);
+
+            writer.Key("code");
+            writer.Uint64(errorCode);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+    res.status = 200;
 }
 
 void RpcServer::handleOptions(const httplib::Request &req, httplib::Response &res) const
@@ -916,6 +995,135 @@ std::tuple<Error, uint16_t> RpcServer::getGlobalIndexes(
 
     writer.Key("status");
     writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlockTemplate(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+
+    writer.StartObject();
+
+    const uint64_t reserveSize = getUint64FromJSON(params, "reserve_size");
+
+    if (reserveSize > 255)
+    {
+        failJsonRpcRequest(
+            -3,
+            "Too big reserved size, maximum allowed is 255",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    const std::string address = getStringFromJSON(params, "wallet_address");
+
+    Error addressError = validateAddresses({address}, false);
+
+    if (addressError)
+    {
+        failJsonRpcRequest(
+            -4,
+            addressError.getErrorMessage(),
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    const auto [publicSpendKey, publicViewKey] = Utilities::addressToKeys(address);
+
+    CryptoNote::BlockTemplate blockTemplate;
+
+    std::vector<uint8_t> blobReserve;
+    blobReserve.resize(reserveSize, 0);
+
+    uint64_t difficulty;
+    uint32_t height;
+
+    const auto [success, error] = m_core->getBlockTemplate(
+        blockTemplate, publicViewKey, publicSpendKey, blobReserve, difficulty, height
+    );
+
+    if (!success)
+    {
+        failJsonRpcRequest(
+            -5,
+            "Failed to create block template: " + error,
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    std::vector<uint8_t> blockBlob = CryptoNote::toBinaryArray(blockTemplate);
+
+    const auto transactionPublicKey = Utilities::getTransactionPublicKeyFromExtra(
+        blockTemplate.baseTransaction.extra
+    );
+
+    uint64_t reservedOffset = 0;
+
+    if (reserveSize > 0)
+    {
+        /* Find where in the block blob the transaction public key is */
+        const auto it = std::search(
+            blockBlob.begin(),
+            blockBlob.end(),
+            std::begin(transactionPublicKey.data),
+            std::end(transactionPublicKey.data)
+        );
+
+        /* The reserved offset is past the transactionPublicKey, then past
+         * the extra nonce tags */
+        reservedOffset = (it - blockBlob.begin()) + sizeof(transactionPublicKey) + 3;
+
+        if (reservedOffset + reserveSize > blockBlob.size())
+        {
+            failJsonRpcRequest(
+                -5,
+                "Internal error: failed to create block template, not enough space for reserved bytes",
+                res
+            );
+
+            return {SUCCESS, 200};
+        }
+    }
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("height");
+        writer.Uint(height);
+
+        writer.Key("difficulty");
+        writer.Uint64(difficulty);
+
+        writer.Key("reserved_offset");
+        writer.Uint64(reservedOffset);
+
+        writer.Key("blocktemplate_blob");
+        writer.String(Common::toHex(blockBlob));
+
+        writer.Key("status");
+        writer.String("OK");
+    }
+    writer.EndObject();
 
     writer.EndObject();
 
