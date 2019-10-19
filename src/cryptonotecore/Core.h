@@ -134,7 +134,7 @@ namespace CryptoNote
 
         virtual std::error_code addBlock(RawBlock &&rawBlock) override;
 
-        virtual std::error_code submitBlock(BinaryArray &&rawBlockTemplate) override;
+        virtual std::error_code submitBlock(const BinaryArray &rawBlockTemplate) override;
 
         virtual bool getTransactionGlobalIndexes(
             const Crypto::Hash &transactionHash,

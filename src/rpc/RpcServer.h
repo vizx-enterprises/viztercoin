@@ -85,7 +85,7 @@ class RpcServer
     void failRequest(uint16_t statusCode, std::string body, httplib::Response &res);
 
     void failJsonRpcRequest(
-        const uint64_t errorCode,
+        const int64_t errorCode,
         const std::string errorMessage,
         httplib::Response &res);
 
@@ -129,6 +129,9 @@ class RpcServer
 
     std::tuple<Error, uint16_t>
         getBlockTemplate(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
+    std::tuple<Error, uint16_t>
+        submitBlock(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
     //////////////////////////////
     /* Private member variables */

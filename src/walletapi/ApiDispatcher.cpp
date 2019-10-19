@@ -54,7 +54,12 @@ ApiDispatcher::ApiDispatcher(
         return [=](const httplib::Request &req, httplib::Response &res) {
             /* Pass the inputted function with the arguments passed through
                to middleware */
-            middleware(req, res, walletState, viewWalletPermitted, std::bind(function, this, _1, _2, _3));
+            middleware(
+                req,
+                res,
+                walletState,
+                viewWalletPermitted,
+                std::bind(function, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         };
     };
 

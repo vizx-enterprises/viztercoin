@@ -1503,7 +1503,7 @@ namespace CryptoNote
         return addBlock(cachedBlock, std::move(rawBlock));
     }
 
-    std::error_code Core::submitBlock(BinaryArray &&rawBlockTemplate)
+    std::error_code Core::submitBlock(const BinaryArray &rawBlockTemplate)
     {
         throwIfNotInitialized();
 

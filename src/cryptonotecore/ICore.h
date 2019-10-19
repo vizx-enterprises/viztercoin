@@ -130,7 +130,7 @@ namespace CryptoNote
 
         virtual std::error_code addBlock(RawBlock &&rawBlock) = 0;
 
-        virtual std::error_code submitBlock(BinaryArray &&rawBlockTemplate) = 0;
+        virtual std::error_code submitBlock(const BinaryArray &rawBlockTemplate) = 0;
 
         virtual bool getTransactionGlobalIndexes(
             const Crypto::Hash &transactionHash,

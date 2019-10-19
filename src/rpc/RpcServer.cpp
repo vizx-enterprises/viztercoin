@@ -98,6 +98,10 @@ RpcServer::RpcServer(
                 {
                     router(&RpcServer::getBlockTemplate, RpcMode::Default, bodyRequired)(req, res);
                 }
+                else if (method == "submitblock")
+                {
+                    router(&RpcServer::submitBlock, RpcMode::Default, bodyRequired)(req, res);
+                }
                 else
                 {
                     res.status = 404;
@@ -305,7 +309,7 @@ void RpcServer::failRequest(uint16_t statusCode, std::string body, httplib::Resp
 }
 
 void RpcServer::failJsonRpcRequest(
-    const uint64_t errorCode,
+    const int64_t errorCode,
     const std::string errorMessage,
     httplib::Response &res)
 {
@@ -324,7 +328,7 @@ void RpcServer::failJsonRpcRequest(
             writer.String(errorMessage);
 
             writer.Key("code");
-            writer.Uint64(errorCode);
+            writer.Int64(errorCode);
         }
         writer.EndObject();
     }
@@ -1120,6 +1124,89 @@ std::tuple<Error, uint16_t> RpcServer::getBlockTemplate(
         writer.Key("blocktemplate_blob");
         writer.String(Common::toHex(blockBlob));
 
+        writer.Key("status");
+        writer.String("OK");
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::submitBlock(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getArrayFromJSON(body, "params");
+
+    if (params.Size() != 1)
+    {
+        failJsonRpcRequest(
+            -1,
+            "You must submit one and only one block blob! (Found " + std::to_string(params.Size()) + ")",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    const std::string blockBlob = getStringFromJSONString(params[0]);
+
+    std::vector<uint8_t> rawBlob;
+
+    if (!Common::fromHex(blockBlob, rawBlob))
+    {
+        failJsonRpcRequest(
+            -6,
+            "Submitted block blob is not hex!",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    const auto submitResult = m_core->submitBlock(rawBlob);
+
+    if (submitResult != CryptoNote::error::AddBlockErrorCondition::BLOCK_ADDED)
+    {
+        failJsonRpcRequest(
+            -7,
+            "Block not accepted",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    if (submitResult == CryptoNote::error::AddBlockErrorCode::ADDED_TO_MAIN
+        || submitResult == CryptoNote::error::AddBlockErrorCode::ADDED_TO_ALTERNATIVE_AND_SWITCHED)
+    {
+        CryptoNote::NOTIFY_NEW_BLOCK::request newBlockMessage;
+
+        CryptoNote::BlockTemplate blockTemplate;
+        CryptoNote::fromBinaryArray(blockTemplate, rawBlob);
+        newBlockMessage.block = CryptoNote::RawBlockLegacy(rawBlob, blockTemplate, m_core);
+        newBlockMessage.hop = 0;
+        newBlockMessage.current_blockchain_height = m_core->getTopBlockIndex() + 1;
+
+        m_syncManager->relayBlock(newBlockMessage);
+    }
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
         writer.Key("status");
         writer.String("OK");
     }
