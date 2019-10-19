@@ -315,9 +315,13 @@ namespace CryptoNote
     {
         assert(!chainsStorage.empty());
         assert(!chainsLeaves.empty());
-        assert(blockIndex <= getTopBlockIndex());
 
         throwIfNotInitialized();
+
+        if (blockIndex > getTopBlockIndex())
+        {
+            return Constants::NULL_HASH;
+        }
 
         return chainsLeaves[0]->getBlockHash(blockIndex);
     }
