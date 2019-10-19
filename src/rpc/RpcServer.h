@@ -127,11 +127,18 @@ class RpcServer
     std::tuple<Error, uint16_t>
         getGlobalIndexes(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    ///////////////////////
+    /* JSON RPC REQUESTS */
+    ///////////////////////
+
     std::tuple<Error, uint16_t>
         getBlockTemplate(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
     std::tuple<Error, uint16_t>
         submitBlock(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
+    std::tuple<Error, uint16_t>
+        getBlockCount(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
     //////////////////////////////
     /* Private member variables */

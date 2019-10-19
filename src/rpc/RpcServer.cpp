@@ -49,9 +49,12 @@ RpcServer::RpcServer(
         }
     }
 
+    const bool bodyRequired = true;
+    const bool bodyNotRequired = false;
+
     /* Route the request through our middleware function, before forwarding
        to the specified function */
-    const auto router = [this](const auto function, const RpcMode routePermissions, const bool bodyRequired) {
+    const auto router = [this](const auto function, const RpcMode routePermissions, const bool isBodyRequired) {
         return [=](const httplib::Request &req, httplib::Response &res) {
             /* Pass the inputted function with the arguments passed through
                to middleware */
@@ -59,54 +62,57 @@ RpcServer::RpcServer(
                 req,
                 res,
                 routePermissions,
-                bodyRequired,
+                isBodyRequired,
                 std::bind(function, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)
             );
         };
     };
 
-    const bool bodyRequired = true;
-    const bool bodyNotRequired = false;
+    const auto jsonRpc = [this, router](const auto &req, auto &res) {
+        const auto body = getJsonBody(req, res, true);
 
-    m_server.Get("/info", router(&RpcServer::info, RpcMode::Default, bodyNotRequired))
+        if (!body)
+        {
+            return;
+        }
+
+        if (!hasMember(*body, "method"))
+        {
+            failRequest(400, "Missing JSON parameter: 'method'", res);
+            return;
+        }
+
+        const auto method = getStringFromJSON(*body, "method");
+
+        if (method == "getblocktemplate")
+        {
+            router(&RpcServer::getBlockTemplate, RpcMode::Default, bodyRequired)(req, res);
+        }
+        else if (method == "submitblock")
+        {
+            router(&RpcServer::submitBlock, RpcMode::Default, bodyRequired)(req, res);
+        }
+        else if (method == "getblockcount")
+        {
+            router(&RpcServer::getBlockCount, RpcMode::Default, bodyNotRequired)(req, res);
+        }
+        else
+        {
+            res.status = 404;
+        }
+    };
+
+    m_server.Get("/json_rpc", jsonRpc)
+            .Get("/info", router(&RpcServer::info, RpcMode::Default, bodyNotRequired))
             .Get("/fee", router(&RpcServer::fee, RpcMode::Default, bodyNotRequired))
             .Get("/height", router(&RpcServer::height, RpcMode::Default, bodyNotRequired))
             .Get("/peers", router(&RpcServer::peers, RpcMode::Default, bodyNotRequired))
 
+            .Post("/json_rpc", jsonRpc)
             .Post("/sendrawtransaction", router(&RpcServer::sendTransaction, RpcMode::Default, bodyRequired))
             .Post("/getrandom_outs", router(&RpcServer::getRandomOuts, RpcMode::Default, bodyRequired))
             .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
             .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
-
-            .Post("/json_rpc", [this, router](auto &req, auto &res) {
-                const auto body = getJsonBody(req, res, true);
-
-                if (!body)
-                {
-                    return;
-                }
-
-                if (!hasMember(*body, "method"))
-                {
-                    failRequest(400, "Missing JSON parameter: 'method'", res);
-                    return;
-                }
-
-                const auto method = getStringFromJSON(*body, "method");
-
-                if (method == "getblocktemplate")
-                {
-                    router(&RpcServer::getBlockTemplate, RpcMode::Default, bodyRequired)(req, res);
-                }
-                else if (method == "submitblock")
-                {
-                    router(&RpcServer::submitBlock, RpcMode::Default, bodyRequired)(req, res);
-                }
-                else
-                {
-                    res.status = 404;
-                }
-            })
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -1209,6 +1215,37 @@ std::tuple<Error, uint16_t> RpcServer::submitBlock(
     {
         writer.Key("status");
         writer.String("OK");
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlockCount(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("count");
+        writer.Uint64(m_core->getTopBlockIndex() + 1);
     }
     writer.EndObject();
 
