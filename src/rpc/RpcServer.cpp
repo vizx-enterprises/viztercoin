@@ -101,6 +101,10 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getBlockHashForHeight, RpcMode::Default, bodyRequired)(req, res);
         }
+        else if (method == "getlastblockheader")
+        {
+            router(&RpcServer::getLastBlockHeader, RpcMode::Default, bodyNotRequired)(req, res);
+        }
         else
         {
             res.status = 404;
@@ -1316,6 +1320,90 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHashForHeight(
 
     writer.Key("result");
     writer.String(Common::podToHex(blockHash));
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto height = m_core->getTopBlockIndex();
+    const auto hash = m_core->getBlockHashByIndex(height);
+    const auto topBlock = m_core->getBlockByHash(hash);
+    const auto outputs = topBlock.baseTransaction.outputs;
+    const auto extraDetails = m_core->getBlockDetails(hash);
+
+    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+        [](const auto acc, const auto out) {
+            return acc + out.amount;
+        }
+    );
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("block_header");
+        writer.StartObject();
+        {
+            writer.Key("major_version");
+            writer.Uint64(topBlock.majorVersion);
+
+            writer.Key("minor_version");
+            writer.Uint64(topBlock.minorVersion);
+
+            writer.Key("timestamp");
+            writer.Uint64(topBlock.timestamp);
+
+            writer.Key("prev_hash");
+            writer.String(Common::podToHex(topBlock.previousBlockHash));
+
+            writer.Key("nonce");
+            writer.Uint64(topBlock.nonce);
+
+            writer.Key("orphan_status");
+            writer.Bool(false);
+
+            writer.Key("height");
+            writer.Uint64(height);
+
+            writer.Key("depth");
+            writer.Uint64(0);
+
+            writer.Key("hash");
+            writer.String(Common::podToHex(hash));
+
+            writer.Key("difficulty");
+            writer.Uint64(m_core->getBlockDifficulty(height));
+
+            writer.Key("reward");
+            writer.Uint64(reward);
+
+            writer.Key("num_txes");
+            writer.Uint64(extraDetails.transactions.size());
+
+            writer.Key("block_size");
+            writer.Uint64(extraDetails.blockSize);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
 
     writer.EndObject();
 
