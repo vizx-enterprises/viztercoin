@@ -105,6 +105,10 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getLastBlockHeader, RpcMode::Default, bodyNotRequired)(req, res);
         }
+        else if (method == "getblockheaderbyhash")
+        {
+            router(&RpcServer::getBlockHeaderByHash, RpcMode::Default, bodyRequired)(req, res);
+        }
         else
         {
             res.status = 404;
@@ -1385,6 +1389,124 @@ std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
 
             writer.Key("depth");
             writer.Uint64(0);
+
+            writer.Key("hash");
+            writer.String(Common::podToHex(hash));
+
+            writer.Key("difficulty");
+            writer.Uint64(m_core->getBlockDifficulty(height));
+
+            writer.Key("reward");
+            writer.Uint64(reward);
+
+            writer.Key("num_txes");
+            writer.Uint64(extraDetails.transactions.size());
+
+            writer.Key("block_size");
+            writer.Uint64(extraDetails.blockSize);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+    const auto hashStr = getStringFromJSON(params, "hash");
+    const auto topHeight = m_core->getTopBlockIndex();
+
+    Crypto::Hash hash;
+
+    if (!Common::podFromHex(hashStr, hash))
+    {
+        failJsonRpcRequest(
+            -1,
+            "Block hash specified is not a valid hex!",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    CryptoNote::BlockTemplate block;
+
+    try
+    {
+        block = m_core->getBlockByHash(hash);
+    }
+    catch (const std::runtime_error &)
+    {
+        failJsonRpcRequest(
+            -5,
+            "Block hash specified does not exist!",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    CryptoNote::CachedBlock cachedBlock(block);
+
+    const auto height = cachedBlock.getBlockIndex();
+    const auto outputs = block.baseTransaction.outputs;
+    const auto extraDetails = m_core->getBlockDetails(hash);
+
+    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+        [](const auto acc, const auto out) {
+            return acc + out.amount;
+        }
+    );
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("block_header");
+        writer.StartObject();
+        {
+            writer.Key("major_version");
+            writer.Uint64(block.majorVersion);
+
+            writer.Key("minor_version");
+            writer.Uint64(block.minorVersion);
+
+            writer.Key("timestamp");
+            writer.Uint64(block.timestamp);
+
+            writer.Key("prev_hash");
+            writer.String(Common::podToHex(block.previousBlockHash));
+
+            writer.Key("nonce");
+            writer.Uint64(block.nonce);
+
+            writer.Key("orphan_status");
+            writer.Bool(false);
+
+            writer.Key("height");
+            writer.Uint64(height);
+
+            writer.Key("depth");
+            writer.Uint64(topHeight - height);
 
             writer.Key("hash");
             writer.String(Common::podToHex(hash));

@@ -146,6 +146,9 @@ class RpcServer
     std::tuple<Error, uint16_t>
         getLastBlockHeader(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    std::tuple<Error, uint16_t>
+        getBlockHeaderByHash(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
     //////////////////////////////
     /* Private member variables */
     //////////////////////////////
