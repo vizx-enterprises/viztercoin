@@ -109,6 +109,10 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getBlockHeaderByHash, RpcMode::Default, bodyRequired)(req, res);
         }
+        else if (method == "getblockheaderbyheight")
+        {
+            router(&RpcServer::getBlockHeaderByHeight, RpcMode::Default, bodyRequired)(req, res);
+        }
         else
         {
             res.status = 404;
@@ -1310,7 +1314,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHashForHeight(
         failJsonRpcRequest(
             -2,
             "Requested hash for a height that is higher than the current "
-            "blockchain height! Current height: " + std::to_string(m_core->getTopBlockIndex() + 1),
+            "blockchain height! Current height: " + std::to_string(m_core->getTopBlockIndex()),
             res
         );
 
@@ -1461,6 +1465,106 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
     CryptoNote::CachedBlock cachedBlock(block);
 
     const auto height = cachedBlock.getBlockIndex();
+    const auto outputs = block.baseTransaction.outputs;
+    const auto extraDetails = m_core->getBlockDetails(hash);
+
+    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+        [](const auto acc, const auto out) {
+            return acc + out.amount;
+        }
+    );
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("block_header");
+        writer.StartObject();
+        {
+            writer.Key("major_version");
+            writer.Uint64(block.majorVersion);
+
+            writer.Key("minor_version");
+            writer.Uint64(block.minorVersion);
+
+            writer.Key("timestamp");
+            writer.Uint64(block.timestamp);
+
+            writer.Key("prev_hash");
+            writer.String(Common::podToHex(block.previousBlockHash));
+
+            writer.Key("nonce");
+            writer.Uint64(block.nonce);
+
+            writer.Key("orphan_status");
+            writer.Bool(false);
+
+            writer.Key("height");
+            writer.Uint64(height);
+
+            writer.Key("depth");
+            writer.Uint64(topHeight - height);
+
+            writer.Key("hash");
+            writer.String(Common::podToHex(hash));
+
+            writer.Key("difficulty");
+            writer.Uint64(m_core->getBlockDifficulty(height));
+
+            writer.Key("reward");
+            writer.Uint64(reward);
+
+            writer.Key("num_txes");
+            writer.Uint64(extraDetails.transactions.size());
+
+            writer.Key("block_size");
+            writer.Uint64(extraDetails.blockSize);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+    const auto height = getUint64FromJSON(params, "height");
+    const auto topHeight = m_core->getTopBlockIndex();
+
+    if (height > topHeight)
+    {
+        failJsonRpcRequest(
+            -2,
+            "Requested block header for a height that is higher than the current "
+            "blockchain height! Current height: " + std::to_string(topHeight),
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    const auto hash = m_core->getBlockHashByIndex(height);
+    const auto block = m_core->getBlockByHash(hash);
+
     const auto outputs = block.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
