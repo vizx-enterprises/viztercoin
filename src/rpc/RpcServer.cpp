@@ -11,6 +11,7 @@
 #include "version.h"
 
 #include <config/Constants.h>
+#include <common/CryptoNoteTools.h>
 #include <errors/ValidateParameters.h>
 #include <logger/Logger.h>
 #include <serialization/SerializationTools.h>
@@ -116,6 +117,10 @@ RpcServer::RpcServer(
         else if (method == "f_blocks_list_json")
         {
             router(&RpcServer::getBlocksByHeight, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
+        }
+        else if (method == "f_block_json")
+        {
+            router(&RpcServer::getBlockDetailsByHash, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
         }
         else
         {
@@ -1391,7 +1396,7 @@ std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
             writer.Uint64(topBlock.nonce);
 
             writer.Key("orphan_status");
-            writer.Bool(false);
+            writer.Bool(extraDetails.isAlternative);
 
             writer.Key("height");
             writer.Uint64(height);
@@ -1509,7 +1514,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
             writer.Uint64(block.nonce);
 
             writer.Key("orphan_status");
-            writer.Bool(false);
+            writer.Bool(extraDetails.isAlternative);
 
             writer.Key("height");
             writer.Uint64(height);
@@ -1609,7 +1614,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
             writer.Uint64(block.nonce);
 
             writer.Key("orphan_status");
-            writer.Bool(false);
+            writer.Bool(extraDetails.isAlternative);
 
             writer.Key("height");
             writer.Uint64(height);
@@ -1715,6 +1720,235 @@ std::tuple<Error, uint16_t> RpcServer::getBlocksByHeight(
             }
         }
         writer.EndArray();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+    const auto hashStr = getStringFromJSON(params, "hash");
+    const auto topHeight = m_core->getTopBlockIndex();
+
+    Crypto::Hash hash;
+
+    /* Hash parameter can be both a hash string, and a number... because cryptonote.. */
+    try
+    {
+        uint64_t height = std::stoull(hashStr);
+
+        hash = m_core->getBlockHashByIndex(height - 1);
+
+        if (hash == Constants::NULL_HASH)
+        {
+            failJsonRpcRequest(
+                -2,
+                "Requested hash for a height that is higher than the current "
+                "blockchain height! Current height: " + std::to_string(topHeight),
+                res
+            );
+
+            return {SUCCESS, 200};
+        }
+    }
+    catch (const std::invalid_argument &)
+    {
+        if (!Common::podFromHex(hashStr, hash))
+        {
+            failJsonRpcRequest(
+                -1,
+                "Block hash specified is not a valid hex!",
+                res
+            );
+
+            return {SUCCESS, 200};
+        }
+    }
+
+    const auto block = m_core->getBlockByHash(hash);
+    const auto extraDetails = m_core->getBlockDetails(hash);
+    const auto height = CryptoNote::CachedBlock(block).getBlockIndex();
+    const auto outputs = block.baseTransaction.outputs;
+
+    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+        [](const auto acc, const auto out) {
+            return acc + out.amount;
+        }
+    );
+
+    const uint64_t blockSizeMedian = std::max(
+        extraDetails.sizeMedian,
+        m_core->getCurrency().blockGrantedFullRewardZoneByBlockVersion(block.majorVersion)
+    );
+
+    std::vector<Crypto::Hash> ignore;
+    std::vector<std::vector<uint8_t>> transactions;
+
+    m_core->getTransactions(block.transactionHashes, transactions, ignore);
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("block");
+        writer.StartObject();
+        {
+            writer.Key("major_version");
+            writer.Uint64(block.majorVersion);
+
+            writer.Key("minor_version");
+            writer.Uint64(block.minorVersion);
+
+            writer.Key("timestamp");
+            writer.Uint64(block.timestamp);
+
+            writer.Key("prev_hash");
+            writer.String(Common::podToHex(block.previousBlockHash));
+
+            writer.Key("nonce");
+            writer.Uint64(block.nonce);
+
+            writer.Key("orphan_status");
+            writer.Bool(extraDetails.isAlternative);
+
+            writer.Key("height");
+            writer.Uint64(height);
+
+            writer.Key("depth");
+            writer.Uint64(topHeight - height);
+
+            writer.Key("hash");
+            writer.String(Common::podToHex(hash));
+
+            writer.Key("difficulty");
+            writer.Uint64(m_core->getBlockDifficulty(height));
+
+            writer.Key("reward");
+            writer.Uint64(reward);
+
+            writer.Key("blockSize");
+            writer.Uint64(extraDetails.blockSize);
+
+            writer.Key("transactionsCumulativeSize");
+            writer.Uint64(extraDetails.transactionsCumulativeSize);
+
+            writer.Key("alreadyGeneratedCoins");
+            writer.String(std::to_string(extraDetails.alreadyGeneratedCoins));
+
+            writer.Key("alreadyGeneratedTransactions");
+            writer.Uint64(extraDetails.alreadyGeneratedTransactions);
+
+            writer.Key("sizeMedian");
+            writer.Uint64(extraDetails.sizeMedian);
+
+            writer.Key("baseReward");
+            writer.Uint64(extraDetails.baseReward);
+
+            writer.Key("penalty");
+            writer.Double(extraDetails.penalty);
+
+            writer.Key("effectiveSizeMedian");
+            writer.Uint64(blockSizeMedian);
+
+            uint64_t totalFee = 0;
+
+            writer.Key("transactions");
+            writer.StartArray();
+            {
+                /* Coinbase transaction */
+                writer.StartObject();
+                {
+                    const auto txOutputs = block.baseTransaction.outputs;
+
+                    const auto outputAmount = std::accumulate(txOutputs.begin(), txOutputs.end(), 0,
+                        [](const auto acc, const auto out) {
+                            return acc + out.amount;
+                        }
+                    );
+
+                    writer.Key("hash");
+                    writer.String(Common::podToHex(getObjectHash(block.baseTransaction)));
+
+                    writer.Key("fee");
+                    writer.Uint64(0);
+
+                    writer.Key("amount_out");
+                    writer.Uint64(outputAmount);
+
+                    writer.Key("size");
+                    writer.Uint64(getObjectBinarySize(block.baseTransaction));
+                }
+                writer.EndObject();
+
+                for (const std::vector<uint8_t> rawTX : transactions)
+                {
+                    writer.StartObject();
+                    {
+                        CryptoNote::Transaction tx;
+
+                        fromBinaryArray(tx, rawTX);
+
+                        const auto outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0,
+                            [](const auto acc, const auto out) {
+                                return acc + out.amount;
+                            }
+                        );
+
+                        const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ul,
+                            [](const auto acc, const auto in) {
+                                if (in.type() == typeid(CryptoNote::KeyInput))
+                                {
+                                    return acc + boost::get<CryptoNote::KeyInput>(in).amount;
+                                }
+
+                                return acc;
+                            }
+                        );
+
+                        const uint64_t fee = inputAmount - outputAmount;
+
+                        writer.Key("hash");
+                        writer.String(Common::podToHex(getObjectHash(tx)));
+
+                        writer.Key("fee");
+                        writer.Uint64(fee);
+
+                        writer.Key("amount_out");
+                        writer.Uint64(outputAmount);
+
+                        writer.Key("size");
+                        writer.Uint64(getObjectBinarySize(tx));
+
+                        totalFee += fee;
+                    }
+                    writer.EndObject();
+                }
+            }
+            writer.EndArray();
+
+            writer.Key("totalFeeAmount");
+            writer.Uint64(totalFee);
+        }
+        writer.EndObject();
     }
     writer.EndObject();
 
