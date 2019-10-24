@@ -98,10 +98,6 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getBlockCount, RpcMode::Default, bodyNotRequired)(req, res);
         }
-        else if (method == "on_getblockhash")
-        {
-            router(&RpcServer::getBlockHashForHeight, RpcMode::Default, bodyRequired)(req, res);
-        }
         else if (method == "getlastblockheader")
         {
             router(&RpcServer::getLastBlockHeader, RpcMode::Default, bodyNotRequired)(req, res);
@@ -1275,69 +1271,6 @@ std::tuple<Error, uint16_t> RpcServer::getBlockCount(
         writer.Uint64(m_core->getTopBlockIndex() + 1);
     }
     writer.EndObject();
-
-    writer.EndObject();
-
-    res.set_content(sb.GetString(), "application/json");
-
-    return {SUCCESS, 200};
-}
-
-std::tuple<Error, uint16_t> RpcServer::getBlockHashForHeight(
-    const httplib::Request &req,
-    httplib::Response &res,
-    const rapidjson::Document &body)
-{
-    rapidjson::StringBuffer sb;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-
-    const auto params = getArrayFromJSON(body, "params");
-
-    if (params.Size() != 1)
-    {
-        failJsonRpcRequest(
-            -1,
-            "You must submit one and only one block height! (Found " + std::to_string(params.Size()) + ")",
-            res
-        );
-
-        return {SUCCESS, 200};
-    }
-
-    const uint64_t height = params[0].GetUint64();
-
-    if (height == 0)
-    {
-        failJsonRpcRequest(
-            -1,
-            "Height must be at least 1",
-            res
-        );
-
-        return {SUCCESS, 200};
-    }
-
-    const auto blockHash = m_core->getBlockHashByIndex(height - 1);
-
-    if (blockHash == Constants::NULL_HASH)
-    {
-        failJsonRpcRequest(
-            -2,
-            "Requested hash for a height that is higher than the current "
-            "blockchain height! Current height: " + std::to_string(m_core->getTopBlockIndex()),
-            res
-        );
-
-        return {SUCCESS, 200};
-    }
-
-    writer.StartObject();
-
-    writer.Key("jsonrpc");
-    writer.String("2.0");
-
-    writer.Key("result");
-    writer.String(Common::podToHex(blockHash));
 
     writer.EndObject();
 
