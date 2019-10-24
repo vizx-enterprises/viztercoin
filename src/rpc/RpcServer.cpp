@@ -145,6 +145,7 @@ RpcServer::RpcServer(
             .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
             .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
             .Post("/queryblockslite", router(&RpcServer::queryBlocksLite, RpcMode::Default, bodyRequired))
+            .Post("/get_transactions_status", router(&RpcServer::getTransactionsStatus, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -2218,13 +2219,8 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
 
             if (!Common::podFromHex(getStringFromJSONString(hashStrJson), hash))
             {
-                failJsonRpcRequest(
-                    -1,
-                    "Block hash specified in blockIds is not a valid hex string!",
-                    res
-                );
-
-                return {SUCCESS, 200};
+                failRequest(400, "Block hash specified is not a valid hex string!", res);
+                return {SUCCESS, 400};
             }
 
             knownBlockHashes.push_back(hash);
@@ -2239,13 +2235,8 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
 
     if (!m_core->queryBlocksLite(knownBlockHashes, timestamp, startHeight, currentHeight, fullOffset, blocks))
     {
-        failJsonRpcRequest(
-            -5,
-            "Internal error: failed to queryBlocksLite",
-            res
-        );
-
-        return {SUCCESS, 200};
+        failRequest(500, "Internal error: failed to queryblockslite", res);
+        return {SUCCESS, 500};
     }
 
     writer.StartObject();
@@ -2404,3 +2395,81 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
     return {SUCCESS, 200};
 }
 
+std::tuple<Error, uint16_t> RpcServer::getTransactionsStatus(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    std::unordered_set<Crypto::Hash> transactionHashes;
+
+    for (const auto &hashStr : getArrayFromJSON(body, "transactionHashes"))
+    {
+        Crypto::Hash hash;
+
+        if (!Common::podFromHex(getStringFromJSONString(hashStr), hash))
+        {
+            failRequest(400, "Transaction hash specified is not a valid hex string!", res);
+            return {SUCCESS, 400};
+        }
+
+        transactionHashes.insert(hash);
+    }
+
+    std::unordered_set<Crypto::Hash> transactionsInPool;
+    std::unordered_set<Crypto::Hash> transactionsInBlock;
+    std::unordered_set<Crypto::Hash> transactionsUnknown;
+
+    const bool success = m_core->getTransactionsStatus(
+        transactionHashes, transactionsInPool, transactionsInBlock, transactionsUnknown
+    );
+
+    if (!success)
+    {
+        failRequest(500, "Internal error: failed to getTransactionsStatus", res);
+        return {SUCCESS, 500};
+    }
+
+    writer.StartObject();
+
+    writer.Key("transactionsInBlock");
+    writer.StartArray();
+    {
+        for (const auto &hash : transactionsInBlock)
+        {
+            writer.String(Common::podToHex(hash));
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("transactionsInPool");
+    writer.StartArray();
+    {
+        for (const auto &hash : transactionsInPool)
+        {
+            writer.String(Common::podToHex(hash));
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("transactionsUnknown");
+    writer.StartArray();
+    {
+        for (const auto &hash : transactionsUnknown)
+        {
+            writer.String(Common::podToHex(hash));
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}

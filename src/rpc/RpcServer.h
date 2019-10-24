@@ -130,6 +130,9 @@ class RpcServer
     std::tuple<Error, uint16_t>
         queryBlocksLite(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    std::tuple<Error, uint16_t>
+        getTransactionsStatus(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
     ///////////////////////
     /* JSON RPC REQUESTS */
     ///////////////////////
