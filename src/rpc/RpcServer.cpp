@@ -122,6 +122,10 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getTransactionDetailsByHash, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
         }
+        else if (method == "f_on_transactions_pool_json")
+        {
+            router(&RpcServer::getTransactionsInPool, RpcMode::BlockExplorerEnabled, bodyNotRequired)(req, res);
+        }
         else
         {
             res.status = 404;
@@ -2107,6 +2111,77 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionDetailsByHash(
             writer.Uint64(txDetails.size);
         }
         writer.EndObject();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getTransactionsInPool(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("transactions");
+        writer.StartArray();
+        {
+            for (const auto tx : m_core->getPoolTransactions())
+            {
+                writer.StartObject();
+
+                const auto outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0,
+                    [](const auto acc, const auto out) {
+                        return acc + out.amount;
+                    }
+                );
+
+                const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ul,
+                    [](const auto acc, const auto in) {
+                        if (in.type() == typeid(CryptoNote::KeyInput))
+                        {
+                            return acc + boost::get<CryptoNote::KeyInput>(in).amount;
+                        }
+
+                        return acc;
+                    }
+                );
+
+                const uint64_t fee = inputAmount - outputAmount;
+
+                writer.Key("hash");
+                writer.String(Common::podToHex(getObjectHash(tx)));
+
+                writer.Key("fee");
+                writer.Uint64(fee);
+
+                writer.Key("amount_out");
+                writer.Uint64(outputAmount);
+
+                writer.Key("size");
+                writer.Uint64(getObjectBinarySize(tx));
+
+                writer.EndObject();
+            }
+        }
+        writer.EndArray();
     }
     writer.EndObject();
 
