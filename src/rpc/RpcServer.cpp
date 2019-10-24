@@ -113,12 +113,17 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getBlockHeaderByHeight, RpcMode::Default, bodyRequired)(req, res);
         }
+        else if (method == "f_blocks_list_json")
+        {
+            router(&RpcServer::getBlocksByHeight, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
+        }
         else
         {
             res.status = 404;
         }
     };
 
+    /* Note: /json_rpc is exposed on both GET and POST */
     m_server.Get("/json_rpc", jsonRpc)
             .Get("/info", router(&RpcServer::info, RpcMode::Default, bodyNotRequired))
             .Get("/fee", router(&RpcServer::fee, RpcMode::Default, bodyNotRequired))
@@ -1628,6 +1633,88 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
             writer.Uint64(extraDetails.blockSize);
         }
         writer.EndObject();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getBlocksByHeight(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+    const auto height = getUint64FromJSON(params, "height");
+    const auto topHeight = m_core->getTopBlockIndex();
+
+    if (height > topHeight)
+    {
+        failJsonRpcRequest(
+            -2,
+            "Requested block header for a height that is higher than the current "
+            "blockchain height! Current height: " + std::to_string(topHeight),
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        const uint64_t MAX_BLOCKS_COUNT = 30;
+        const uint64_t startHeight = height < MAX_BLOCKS_COUNT ? 0 : height - MAX_BLOCKS_COUNT;
+
+        writer.Key("blocks");
+        writer.StartArray();
+        {
+            for (uint64_t i = height; i >= startHeight; i--)
+            {
+                writer.StartObject();
+
+                const auto hash = m_core->getBlockHashByIndex(i);
+                const auto block = m_core->getBlockByHash(hash);
+                const auto extraDetails = m_core->getBlockDetails(hash);
+
+                writer.Key("cumul_size");
+                writer.Uint64(extraDetails.blockSize);
+
+                writer.Key("difficulty");
+                writer.Uint64(extraDetails.difficulty);
+
+                writer.Key("hash");
+                writer.String(Common::podToHex(hash));
+
+                writer.Key("height");
+                writer.Uint64(i);
+
+                writer.Key("timestamp");
+                writer.Uint64(block.timestamp);
+
+                /* Plus one for coinbase tx */
+                writer.Key("tx_count");
+                writer.Uint64(block.transactionHashes.size() + 1);
+
+                writer.EndObject();
+            }
+        }
+        writer.EndArray();
     }
     writer.EndObject();
 
