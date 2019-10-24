@@ -144,6 +144,7 @@ RpcServer::RpcServer(
             .Post("/getrandom_outs", router(&RpcServer::getRandomOuts, RpcMode::Default, bodyRequired))
             .Post("/getwalletsyncdata", router(&RpcServer::getWalletSyncData, RpcMode::Default, bodyRequired))
             .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
+            .Post("/queryblockslite", router(&RpcServer::queryBlocksLite, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -2191,3 +2192,215 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsInPool(
 
     return {SUCCESS, 200};
 }
+
+std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    uint64_t timestamp = 0;
+
+    if (hasMember(body, "timestamp"))
+    {
+        timestamp = getUint64FromJSON(body, "timestamp");
+    }
+
+    std::vector<Crypto::Hash> knownBlockHashes;
+
+    if (hasMember(body, "blockIds"))
+    {
+        for (const auto &hashStrJson : getArrayFromJSON(body, "blockIds"))
+        {
+            Crypto::Hash hash;
+
+            if (!Common::podFromHex(getStringFromJSONString(hashStrJson), hash))
+            {
+                failJsonRpcRequest(
+                    -1,
+                    "Block hash specified in blockIds is not a valid hex string!",
+                    res
+                );
+
+                return {SUCCESS, 200};
+            }
+
+            knownBlockHashes.push_back(hash);
+        }
+    }
+
+    uint32_t startHeight;
+    uint32_t currentHeight;
+    uint32_t fullOffset;
+
+    std::vector<CryptoNote::BlockShortInfo> blocks;
+
+    if (!m_core->queryBlocksLite(knownBlockHashes, timestamp, startHeight, currentHeight, fullOffset, blocks))
+    {
+        failJsonRpcRequest(
+            -5,
+            "Internal error: failed to queryBlocksLite",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    writer.StartObject();
+
+    writer.Key("fullOffset");
+    writer.Uint64(fullOffset);
+
+    writer.Key("currentHeight");
+    writer.Uint64(currentHeight);
+
+    writer.Key("startHeight");
+    writer.Uint64(startHeight);
+
+    writer.Key("items");
+    writer.StartArray();
+    {
+        for (const auto block : blocks)
+        {
+            writer.StartObject();
+            {
+                writer.Key("blockShortInfo.block");
+                writer.StartArray();
+                {
+                    for (const auto c : block.block)
+                    {
+                        writer.Uint64(c);
+                    }
+                }
+                writer.EndArray();
+
+                writer.Key("blockShortInfo.blockId");
+                writer.String(Common::podToHex(block.blockId));
+
+                writer.Key("blockShortInfo.txPrefixes");
+                writer.StartArray();
+                {
+                    for (const auto prefix : block.txPrefixes)
+                    {
+                        writer.StartObject();
+                        {
+                            writer.Key("transactionPrefixInfo.txHash");
+                            writer.String(Common::podToHex(prefix.txHash));
+
+                            writer.Key("txPrefix");
+                            writer.StartObject();
+                            {
+                                writer.Key("extra");
+                                writer.String(Common::podToHex(prefix.txPrefix.extra));
+
+                                writer.Key("unlock_time");
+                                writer.Uint64(prefix.txPrefix.unlockTime);
+
+                                writer.Key("version");
+                                writer.Uint64(prefix.txPrefix.version);
+
+                                writer.Key("vin");
+                                writer.StartArray();
+                                {
+                                    for (const auto input : prefix.txPrefix.inputs)
+                                    {
+                                        const auto type = input.type() == typeid(CryptoNote::BaseInput)
+                                            ? "ff"
+                                            : "02";
+
+                                        writer.StartObject();
+                                        {
+                                            writer.Key("type");
+                                            writer.String(type);
+
+                                            writer.Key("value");
+                                            writer.StartObject();
+                                            {
+                                                if (input.type() == typeid(CryptoNote::BaseInput))
+                                                {
+                                                    writer.Key("height");
+                                                    writer.Uint64(boost::get<CryptoNote::BaseInput>(input).blockIndex);
+                                                }
+                                                else
+                                                {
+                                                    const auto keyInput = boost::get<CryptoNote::KeyInput>(input);
+
+                                                    writer.Key("k_image");
+                                                    writer.String(Common::podToHex(keyInput.keyImage));
+
+                                                    writer.Key("amount");
+                                                    writer.Uint64(keyInput.amount);
+
+                                                    writer.Key("key_offsets");
+                                                    writer.StartArray();
+                                                    {
+                                                        for (const auto index : keyInput.outputIndexes)
+                                                        {
+                                                            writer.Uint(index);
+                                                        }
+                                                    }
+                                                    writer.EndArray();
+                                                }
+                                            }
+                                            writer.EndObject();
+                                        }
+                                        writer.EndObject();
+                                    }
+                                }
+                                writer.EndArray();
+
+                                writer.Key("vout");
+                                writer.StartArray();
+                                {
+                                    for (const auto output : prefix.txPrefix.outputs)
+                                    {
+                                        writer.StartObject();
+                                        {
+                                            writer.Key("amount");
+                                            writer.Uint64(output.amount);
+
+                                            writer.Key("target");
+                                            writer.StartObject();
+                                            {
+                                                writer.Key("data");
+                                                writer.StartObject();
+                                                {
+                                                    writer.Key("key");
+                                                    writer.String(Common::podToHex(boost::get<CryptoNote::KeyOutput>(output.target).key));
+                                                }
+                                                writer.EndObject();
+
+                                                writer.Key("type");
+                                                writer.String("02");
+                                            }
+                                            writer.EndObject();
+                                        }
+                                        writer.EndObject();
+                                    }
+                                }
+                                writer.EndArray();
+                            }
+                            writer.EndObject();
+                        }
+                        writer.EndObject();
+                    }
+                }
+                writer.EndArray();
+            }
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
