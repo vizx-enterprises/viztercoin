@@ -118,6 +118,10 @@ RpcServer::RpcServer(
         {
             router(&RpcServer::getBlockDetailsByHash, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
         }
+        else if (method == "f_transaction_json")
+        {
+            router(&RpcServer::getTransactionDetailsByHash, RpcMode::BlockExplorerEnabled, bodyRequired)(req, res);
+        }
         else
         {
             res.status = 404;
@@ -1880,6 +1884,227 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
 
             writer.Key("totalFeeAmount");
             writer.Uint64(totalFee);
+        }
+        writer.EndObject();
+    }
+    writer.EndObject();
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getTransactionDetailsByHash(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    const auto params = getObjectFromJSON(body, "params");
+    const auto hashStr = getStringFromJSON(params, "hash");
+    const auto topHeight = m_core->getTopBlockIndex();
+
+    Crypto::Hash hash;
+
+    if (!Common::podFromHex(hashStr, hash))
+    {
+        failJsonRpcRequest(
+            -1,
+            "Block hash specified is not a valid hex!",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    std::vector<Crypto::Hash> ignore;
+    std::vector<std::vector<uint8_t>> rawTXs;
+    std::vector<Crypto::Hash> hashes { hash };
+
+    m_core->getTransactions(hashes, rawTXs, ignore);
+
+    if (rawTXs.size() != 1)
+    {
+        failJsonRpcRequest(
+            -1,
+            "Block hash specified does not exist!",
+            res
+        );
+
+        return {SUCCESS, 200};
+    }
+
+    CryptoNote::Transaction transaction;
+    CryptoNote::TransactionDetails txDetails = m_core->getTransactionDetails(hash);
+
+    const uint64_t blockHeight = txDetails.blockIndex;
+    const auto blockHash = m_core->getBlockHashByIndex(blockHeight);
+    const auto block = m_core->getBlockByHash(blockHash);
+    const auto extraDetails = m_core->getBlockDetails(blockHash);
+
+    fromBinaryArray(transaction, rawTXs[0]);
+
+    writer.StartObject();
+
+    writer.Key("jsonrpc");
+    writer.String("2.0");
+
+    writer.Key("result");
+    writer.StartObject();
+    {
+        writer.Key("status");
+        writer.String("OK");
+
+        writer.Key("block");
+        writer.StartObject();
+        {
+            writer.Key("cumul_size");
+            writer.Uint64(extraDetails.blockSize);
+
+            writer.Key("difficulty");
+            writer.Uint64(extraDetails.difficulty);
+
+            writer.Key("hash");
+            writer.String(Common::podToHex(blockHash));
+
+            writer.Key("height");
+            writer.Uint64(blockHeight);
+
+            writer.Key("timestamp");
+            writer.Uint64(block.timestamp);
+
+            /* Plus one for coinbase tx */
+            writer.Key("tx_count");
+            writer.Uint64(block.transactionHashes.size() + 1);
+        }
+        writer.EndObject();
+
+        writer.Key("tx");
+        writer.StartObject();
+        {
+            writer.Key("extra");
+            writer.String(Common::podToHex(transaction.extra));
+
+            writer.Key("unlock_time");
+            writer.Uint64(transaction.unlockTime);
+
+            writer.Key("version");
+            writer.Uint64(transaction.version);
+
+            writer.Key("vin");
+            writer.StartArray();
+            {
+                for (const auto input : transaction.inputs)
+                {
+                    const auto type = input.type() == typeid(CryptoNote::BaseInput)
+                        ? "ff"
+                        : "02";
+
+                    writer.StartObject();
+                    {
+                        writer.Key("type");
+                        writer.String(type);
+
+                        writer.Key("value");
+                        writer.StartObject();
+                        {
+                            if (input.type() == typeid(CryptoNote::BaseInput))
+                            {
+                                writer.Key("height");
+                                writer.Uint64(boost::get<CryptoNote::BaseInput>(input).blockIndex);
+                            }
+                            else
+                            {
+                                const auto keyInput = boost::get<CryptoNote::KeyInput>(input);
+
+                                writer.Key("k_image");
+                                writer.String(Common::podToHex(keyInput.keyImage));
+
+                                writer.Key("amount");
+                                writer.Uint64(keyInput.amount);
+
+                                writer.Key("key_offsets");
+                                writer.StartArray();
+                                {
+                                    for (const auto index : keyInput.outputIndexes)
+                                    {
+                                        writer.Uint(index);
+                                    }
+                                }
+                                writer.EndArray();
+                            }
+                        }
+                        writer.EndObject();
+                    }
+                    writer.EndObject();
+                }
+            }
+            writer.EndArray();
+
+            writer.Key("vout");
+            writer.StartArray();
+            {
+                for (const auto output : transaction.outputs)
+                {
+                    writer.StartObject();
+                    {
+                        writer.Key("amount");
+                        writer.Uint64(output.amount);
+
+                        writer.Key("target");
+                        writer.StartObject();
+                        {
+                            writer.Key("data");
+                            writer.StartObject();
+                            {
+                                writer.Key("key");
+                                writer.String(Common::podToHex(boost::get<CryptoNote::KeyOutput>(output.target).key));
+                            }
+                            writer.EndObject();
+
+                            writer.Key("type");
+                            writer.String("02");
+                        }
+                        writer.EndObject();
+                    }
+                    writer.EndObject();
+                }
+            }
+            writer.EndArray();
+        }
+        writer.EndObject();
+
+        writer.Key("txDetails");
+        writer.StartObject();
+        {
+            writer.Key("hash");
+            writer.String(Common::podToHex(txDetails.hash));
+
+            writer.Key("amount_out");
+            writer.Uint64(txDetails.totalOutputsAmount);
+
+            writer.Key("fee");
+            writer.Uint64(txDetails.fee);
+
+            writer.Key("mixin");
+            writer.Uint64(txDetails.mixin);
+
+            writer.Key("paymentId");
+            if (txDetails.paymentId == Constants::NULL_HASH)
+            {
+                writer.String("");
+            }
+            else
+            {
+                writer.String(Common::podToHex(txDetails.paymentId));
+            }
+
+            writer.Key("size");
+            writer.Uint64(txDetails.size);
         }
         writer.EndObject();
     }
