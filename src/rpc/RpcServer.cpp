@@ -146,6 +146,7 @@ RpcServer::RpcServer(
             .Post("/get_global_indexes_for_range", router(&RpcServer::getGlobalIndexes, RpcMode::Default, bodyRequired))
             .Post("/queryblockslite", router(&RpcServer::queryBlocksLite, RpcMode::Default, bodyRequired))
             .Post("/get_transactions_status", router(&RpcServer::getTransactionsStatus, RpcMode::Default, bodyRequired))
+            .Post("/get_pool_changes_lite", router(&RpcServer::getPoolChanges, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -2280,7 +2281,7 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
                             writer.Key("transactionPrefixInfo.txHash");
                             writer.String(Common::podToHex(prefix.txHash));
 
-                            writer.Key("txPrefix");
+                            writer.Key("transactionPrefixInfo.txPrefix");
                             writer.StartObject();
                             {
                                 writer.Key("extra");
@@ -2463,6 +2464,179 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsStatus(
         }
     }
     writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+std::tuple<Error, uint16_t> RpcServer::getPoolChanges(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    Crypto::Hash lastBlockHash; 
+
+    if (!Common::podFromHex(getStringFromJSON(body, "tailBlockId"), lastBlockHash))
+    {
+        failRequest(400, "tailBlockId specified is not a valid hex string!", res);
+        return {SUCCESS, 400};
+    }
+
+    std::vector<Crypto::Hash> knownHashes;
+
+    for (const auto &hashStr : getArrayFromJSON(body, "knownTxsIds"))
+    {
+        Crypto::Hash hash;
+
+        if (!Common::podFromHex(getStringFromJSONString(hashStr), hash))
+        {
+            failRequest(400, "Transaction hash specified is not a valid hex string!", res);
+            return {SUCCESS, 400};
+        }
+
+        knownHashes.push_back(hash);
+    }
+
+    std::vector<CryptoNote::TransactionPrefixInfo> addedTransactions;
+    std::vector<Crypto::Hash> deletedTransactions;
+
+    const bool atTopOfChain = m_core->getPoolChangesLite(
+        lastBlockHash, knownHashes, addedTransactions, deletedTransactions
+    );
+
+    writer.StartObject();
+
+    writer.Key("addedTxs");
+    writer.StartArray();
+    {
+        for (const auto prefix: addedTransactions)
+        {
+            writer.StartObject();
+            {
+                writer.Key("transactionPrefixInfo.txHash");
+                writer.String(Common::podToHex(prefix.txHash));
+
+                writer.Key("transactionPrefixInfo.txPrefix");
+                writer.StartObject();
+                {
+                    writer.Key("extra");
+                    writer.String(Common::podToHex(prefix.txPrefix.extra));
+
+                    writer.Key("unlock_time");
+                    writer.Uint64(prefix.txPrefix.unlockTime);
+
+                    writer.Key("version");
+                    writer.Uint64(prefix.txPrefix.version);
+
+                    writer.Key("vin");
+                    writer.StartArray();
+                    {
+                        for (const auto input : prefix.txPrefix.inputs)
+                        {
+                            const auto type = input.type() == typeid(CryptoNote::BaseInput)
+                                ? "ff"
+                                : "02";
+
+                            writer.StartObject();
+                            {
+                                writer.Key("type");
+                                writer.String(type);
+
+                                writer.Key("value");
+                                writer.StartObject();
+                                {
+                                    if (input.type() == typeid(CryptoNote::BaseInput))
+                                    {
+                                        writer.Key("height");
+                                        writer.Uint64(boost::get<CryptoNote::BaseInput>(input).blockIndex);
+                                    }
+                                    else
+                                    {
+                                        const auto keyInput = boost::get<CryptoNote::KeyInput>(input);
+
+                                        writer.Key("k_image");
+                                        writer.String(Common::podToHex(keyInput.keyImage));
+
+                                        writer.Key("amount");
+                                        writer.Uint64(keyInput.amount);
+
+                                        writer.Key("key_offsets");
+                                        writer.StartArray();
+                                        {
+                                            for (const auto index : keyInput.outputIndexes)
+                                            {
+                                                writer.Uint(index);
+                                            }
+                                        }
+                                        writer.EndArray();
+                                    }
+                                }
+                                writer.EndObject();
+                            }
+                            writer.EndObject();
+                        }
+                    }
+                    writer.EndArray();
+
+                    writer.Key("vout");
+                    writer.StartArray();
+                    {
+                        for (const auto output : prefix.txPrefix.outputs)
+                        {
+                            writer.StartObject();
+                            {
+                                writer.Key("amount");
+                                writer.Uint64(output.amount);
+
+                                writer.Key("target");
+                                writer.StartObject();
+                                {
+                                    writer.Key("data");
+                                    writer.StartObject();
+                                    {
+                                        writer.Key("key");
+                                        writer.String(Common::podToHex(boost::get<CryptoNote::KeyOutput>(output.target).key));
+                                    }
+                                    writer.EndObject();
+
+                                    writer.Key("type");
+                                    writer.String("02");
+                                }
+                                writer.EndObject();
+                            }
+                            writer.EndObject();
+                        }
+                    }
+                    writer.EndArray();
+                }
+                writer.EndObject();
+            }
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("deletedTxsIds");
+    writer.StartArray();
+    {
+        for (const auto hash : deletedTransactions)
+        {
+            writer.String(Common::podToHex(hash));
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("isTailBlockActual");
+    writer.Bool(atTopOfChain);
 
     writer.Key("status");
     writer.String("OK");
