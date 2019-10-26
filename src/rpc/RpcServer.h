@@ -136,6 +136,9 @@ class RpcServer
     std::tuple<Error, uint16_t>
         getPoolChanges(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    std::tuple<Error, uint16_t>
+        queryBlocksDetailed(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
     ///////////////////////
     /* JSON RPC REQUESTS */
     ///////////////////////
