@@ -1932,11 +1932,11 @@ inline std::tuple<socket_t, SocketError> Server::create_server_socket(const char
                 #ifdef _WIN32
                 switch(WSAGetLastError())
                 {
-                    case WSANOTINITIALIZED:
+                    case WSANOTINITIALISED:
                     {
                         return UNKNOWN_ERROR;
                     }
-                    case WSANETDOWN:
+                    case WSAENETDOWN:
                     {
                         return NO_INTERNET;
                     }
@@ -2014,11 +2014,11 @@ inline std::tuple<socket_t, SocketError> Server::create_server_socket(const char
                 #ifdef _WIN32
                 switch(WSAGetLastError())
                 {
-                    case WSANOTINITIALIZED:
+                    case WSANOTINITIALISED:
                     {
                         return UNKNOWN_ERROR;
                     }
-                    case WSANETDOWN:
+                    case WSAENETDOWN:
                     {
                         return NO_INTERNET;
                     }

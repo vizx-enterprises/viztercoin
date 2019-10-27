@@ -70,7 +70,7 @@ RpcServer::RpcServer(
         };
     };
 
-    const auto jsonRpc = [this, router](const auto &req, auto &res) {
+    const auto jsonRpc = [this, router, bodyRequired, bodyNotRequired](const auto &req, auto &res) {
         const auto body = getJsonBody(req, res, true);
 
         if (!body)
