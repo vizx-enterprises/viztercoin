@@ -148,6 +148,7 @@ RpcServer::RpcServer(
             .Post("/get_transactions_status", router(&RpcServer::getTransactionsStatus, RpcMode::Default, bodyRequired))
             .Post("/get_pool_changes_lite", router(&RpcServer::getPoolChanges, RpcMode::Default, bodyRequired))
             .Post("/queryblocksdetailed", router(&RpcServer::queryBlocksDetailed, RpcMode::AllMethodsEnabled, bodyRequired))
+            .Post("/get_o_indexes", router(&RpcServer::getGlobalIndexesDeprecated, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -2984,6 +2985,56 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksDetailed(
                 writer.EndArray();
             }
             writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.set_content(sb.GetString(), "application/json");
+
+    return {SUCCESS, 200};
+}
+
+/* Deprecated. Use getGlobalIndexes instead. */
+std::tuple<Error, uint16_t> RpcServer::getGlobalIndexesDeprecated(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    Crypto::Hash hash;
+
+    if (!Common::podFromHex(getStringFromJSON(body, "txid"), hash))
+    {
+        failRequest(400, "txid specified is not a valid hex string!", res);
+        return {SUCCESS, 400};
+    }
+
+    std::vector<uint32_t> indexes;
+
+    const bool success = m_core->getTransactionGlobalIndexes(hash, indexes);
+
+    if (!success)
+    {
+        failRequest(500, "Internal error: Failed to getTransactionGlobalIndexes", res);
+        return {SUCCESS, 500};
+    }
+
+    writer.StartObject();
+
+    writer.Key("o_indexes");
+
+    writer.StartArray();
+    {
+        for (const auto &index : indexes)
+        {
+            writer.Uint64(index);
         }
     }
     writer.EndArray();
