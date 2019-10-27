@@ -1309,7 +1309,7 @@ std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
     const auto outputs = topBlock.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ull,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1427,7 +1427,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
     const auto outputs = block.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ull,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1527,7 +1527,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
     const auto outputs = block.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ull,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1731,7 +1731,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
     const auto height = CryptoNote::CachedBlock(block).getBlockIndex();
     const auto outputs = block.baseTransaction.outputs;
 
-    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ull,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1739,7 +1739,9 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
 
     const uint64_t blockSizeMedian = std::max(
         extraDetails.sizeMedian,
-        m_core->getCurrency().blockGrantedFullRewardZoneByBlockVersion(block.majorVersion)
+        static_cast<uint64_t>(
+            m_core->getCurrency().blockGrantedFullRewardZoneByBlockVersion(block.majorVersion)
+        )
     );
 
     std::vector<Crypto::Hash> ignore;
@@ -1828,7 +1830,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
                 {
                     const auto txOutputs = block.baseTransaction.outputs;
 
-                    const uint64_t outputAmount = std::accumulate(txOutputs.begin(), txOutputs.end(), 0ul,
+                    const uint64_t outputAmount = std::accumulate(txOutputs.begin(), txOutputs.end(), 0ull,
                         [](const auto acc, const auto out) {
                             return acc + out.amount;
                         }
@@ -1856,13 +1858,13 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
 
                         fromBinaryArray(tx, rawTX);
 
-                        const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ul,
+                        const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ull,
                             [](const auto acc, const auto out) {
                                 return acc + out.amount;
                             }
                         );
 
-                        const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ul,
+                        const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ull,
                             [](const auto acc, const auto in) {
                                 if (in.type() == typeid(CryptoNote::KeyInput))
                                 {
@@ -2155,13 +2157,13 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsInPool(
             {
                 writer.StartObject();
 
-                const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ul,
+                const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ull,
                     [](const auto acc, const auto out) {
                         return acc + out.amount;
                     }
                 );
 
-                const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ul,
+                const uint64_t inputAmount = std::accumulate(tx.inputs.begin(), tx.inputs.end(), 0ull,
                     [](const auto acc, const auto in) {
                         if (in.type() == typeid(CryptoNote::KeyInput))
                         {
