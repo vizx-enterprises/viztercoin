@@ -6,6 +6,7 @@
 
 #include <future>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "httplib.h"

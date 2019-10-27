@@ -201,7 +201,10 @@ std::optional<rapidjson::Document> RpcServer::getJsonBody(
 
     if (!bodyRequired)
     {
-        return jsonBody;
+        /* Some compilers are stupid and can't figure out just `return jsonBody`
+         * and we can't construct a std::optional(jsonBody) since the copy
+         * constructor is deleted, so we need to std::move */
+        return std::optional<rapidjson::Document>(std::move(jsonBody));
     }
 
     if (jsonBody.Parse(req.body.c_str()).HasParseError())
@@ -228,7 +231,7 @@ std::optional<rapidjson::Document> RpcServer::getJsonBody(
         return std::nullopt;
     }
 
-    return jsonBody;
+    return std::optional<rapidjson::Document>(std::move(jsonBody));
 }
 
 void RpcServer::middleware(
@@ -1306,7 +1309,7 @@ std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
     const auto outputs = topBlock.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1424,7 +1427,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
     const auto outputs = block.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1524,7 +1527,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
     const auto outputs = block.baseTransaction.outputs;
     const auto extraDetails = m_core->getBlockDetails(hash);
 
-    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1728,7 +1731,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
     const auto height = CryptoNote::CachedBlock(block).getBlockIndex();
     const auto outputs = block.baseTransaction.outputs;
 
-    const auto reward = std::accumulate(outputs.begin(), outputs.end(), 0,
+    const uint64_t reward = std::accumulate(outputs.begin(), outputs.end(), 0ul,
         [](const auto acc, const auto out) {
             return acc + out.amount;
         }
@@ -1825,7 +1828,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
                 {
                     const auto txOutputs = block.baseTransaction.outputs;
 
-                    const auto outputAmount = std::accumulate(txOutputs.begin(), txOutputs.end(), 0,
+                    const uint64_t outputAmount = std::accumulate(txOutputs.begin(), txOutputs.end(), 0ul,
                         [](const auto acc, const auto out) {
                             return acc + out.amount;
                         }
@@ -1853,7 +1856,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
 
                         fromBinaryArray(tx, rawTX);
 
-                        const auto outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0,
+                        const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ul,
                             [](const auto acc, const auto out) {
                                 return acc + out.amount;
                             }
@@ -2152,7 +2155,7 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsInPool(
             {
                 writer.StartObject();
 
-                const auto outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0,
+                const uint64_t outputAmount = std::accumulate(tx.outputs.begin(), tx.outputs.end(), 0ul,
                     [](const auto acc, const auto out) {
                         return acc + out.amount;
                     }

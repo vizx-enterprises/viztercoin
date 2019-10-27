@@ -552,6 +552,10 @@ inline std::string getSocketErrorMessage(SocketError error)
         {
             return "Too many socket connections are open already.";
         }
+        default:
+        {
+            throw std::runtime_error("Programmer error @ getSocketErrorMessage");
+        }
     }
 }
 
