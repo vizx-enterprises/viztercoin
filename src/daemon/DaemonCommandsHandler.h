@@ -63,17 +63,7 @@ class DaemonCommandsHandler
 
     bool print_pl(const std::vector<std::string> &args);
 
-    bool show_hr(const std::vector<std::string> &args);
-
-    bool hide_hr(const std::vector<std::string> &args);
-
-    bool print_bc_outs(const std::vector<std::string> &args);
-
     bool print_cn(const std::vector<std::string> &args);
-
-    bool print_bc(const std::vector<std::string> &args);
-
-    bool print_bci(const std::vector<std::string> &args);
 
     bool set_log(const std::vector<std::string> &args);
 
@@ -84,10 +74,6 @@ class DaemonCommandsHandler
     bool print_pool(const std::vector<std::string> &args);
 
     bool print_pool_sh(const std::vector<std::string> &args);
-
-    bool start_mining(const std::vector<std::string> &args);
-
-    bool stop_mining(const std::vector<std::string> &args);
 
     bool status(const std::vector<std::string> &args);
 
