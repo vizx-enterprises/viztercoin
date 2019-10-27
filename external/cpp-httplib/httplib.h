@@ -681,6 +681,47 @@ std::tuple<socket_t, SocketError> create_socket(const char* host, int port, Fn f
 
     if (getAddrInfoError != 0)
     {
+        #ifdef WIN32
+        switch(WSAGetLastError())
+        {
+            case WSATRY_AGAIN:
+            {
+                return { INVALID_SOCKET, TMP_DNS_FAIL };
+            }
+            case WSAEINVAL:
+            {
+                return { INVALID_SOCKET, INVALID_FLAGS };
+            }
+            case WSANO_RECOVERY:
+            {
+                return { INVALID_SOCKET, DNS_FAIL };
+            }
+            case WSAEAFNOSUPPORT:
+            {
+                return { INVALID_SOCKET, BAD_HOST };
+            }
+            case WSA_NOT_ENOUGH_MEMORY:
+            {
+                return { INVALID_SOCKET, OUT_OF_MEMORY };
+            }
+            case WSAHOST_NOT_FOUND:
+            {
+                return { INVALID_SOCKET, BAD_HOST };
+            }
+            case WSATYPE_NOT_FOUND:
+            {
+                return { INVALID_SOCKET, INVALID_SERVICE };
+            }
+            case WSAESOCKTNOSUPPORT:
+            {
+                return { INVALID_SOCKET, INVALID_FLAGS };
+            }
+            default:
+            {
+                return { INVALID_SOCKET, UNKNOWN_ERROR };
+            }
+        }
+        #else
         switch(getAddrInfoError)
         {
             case EAI_ADDRFAMILY:
@@ -732,6 +773,7 @@ std::tuple<socket_t, SocketError> create_socket(const char* host, int port, Fn f
                 return { INVALID_SOCKET, UNKNOWN_ERROR };
             }
         }
+        #endif
     }
 
     SocketError error;
