@@ -254,6 +254,8 @@ void RpcServer::middleware(
     {
         res.set_header("Access-Control-Allow-Origin", m_corsHeader);
     }
+
+    res.set_header("Content-Type", "application/json");
     
     const auto jsonBody = getJsonBody(req, res, bodyRequired);
 
@@ -302,7 +304,7 @@ void RpcServer::middleware(
 
             writer.EndObject();
 
-            res.set_content(sb.GetString(), "application/json");
+            res.body = sb.GetString();
             res.status = 400;
         }
         else
@@ -349,7 +351,7 @@ void RpcServer::failRequest(uint16_t statusCode, std::string body, httplib::Resp
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
     res.status = statusCode;
 }
 
@@ -379,7 +381,7 @@ void RpcServer::failJsonRpcRequest(
     }
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
     res.status = 200;
 }
 
@@ -506,7 +508,7 @@ std::tuple<Error, uint16_t> RpcServer::info(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -532,7 +534,7 @@ std::tuple<Error, uint16_t> RpcServer::fee(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -558,7 +560,7 @@ std::tuple<Error, uint16_t> RpcServer::height(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -607,7 +609,7 @@ std::tuple<Error, uint16_t> RpcServer::peers(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -687,7 +689,7 @@ std::tuple<Error, uint16_t> RpcServer::sendTransaction(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
     
     return {SUCCESS, 200};
 }
@@ -772,7 +774,7 @@ std::tuple<Error, uint16_t> RpcServer::getRandomOuts(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -984,7 +986,7 @@ std::tuple<Error, uint16_t> RpcServer::getWalletSyncData(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1011,7 +1013,7 @@ std::tuple<Error, uint16_t> RpcServer::getGlobalIndexes(
         writer.Key("status");
         writer.String("Failed");
 
-        res.set_content(sb.GetString(), "application/json");
+        res.body = sb.GetString();
 
         return {SUCCESS, 500};
     }
@@ -1047,7 +1049,7 @@ std::tuple<Error, uint16_t> RpcServer::getGlobalIndexes(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1176,7 +1178,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockTemplate(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1259,7 +1261,7 @@ std::tuple<Error, uint16_t> RpcServer::submitBlock(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1290,7 +1292,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockCount(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1374,7 +1376,7 @@ std::tuple<Error, uint16_t> RpcServer::getLastBlockHeader(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1492,7 +1494,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHash(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1592,7 +1594,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockHeaderByHeight(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1674,7 +1676,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlocksByHeight(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -1905,7 +1907,7 @@ std::tuple<Error, uint16_t> RpcServer::getBlockDetailsByHash(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2126,7 +2128,7 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionDetailsByHash(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2197,7 +2199,7 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsInPool(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2398,7 +2400,7 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksLite(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2477,7 +2479,7 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionsStatus(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2650,7 +2652,7 @@ std::tuple<Error, uint16_t> RpcServer::getPoolChanges(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -2999,7 +3001,7 @@ std::tuple<Error, uint16_t> RpcServer::queryBlocksDetailed(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
@@ -3049,7 +3051,7 @@ std::tuple<Error, uint16_t> RpcServer::getGlobalIndexesDeprecated(
 
     writer.EndObject();
 
-    res.set_content(sb.GetString(), "application/json");
+    res.body = sb.GetString();
 
     return {SUCCESS, 200};
 }
