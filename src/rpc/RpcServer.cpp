@@ -410,7 +410,7 @@ void RpcServer::handleOptions(const httplib::Request &req, httplib::Response &re
     if (m_corsHeader != "")
     {
         res.set_header("Access-Control-Allow-Origin", m_corsHeader);
-        res.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, X-API-KEY");
+        res.set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     }
 
     res.status = 200;
