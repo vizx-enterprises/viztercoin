@@ -1922,7 +1922,6 @@ std::tuple<Error, uint16_t> RpcServer::getTransactionDetailsByHash(
 
     const auto params = getObjectFromJSON(body, "params");
     const auto hashStr = getStringFromJSON(params, "hash");
-    const auto topHeight = m_core->getTopBlockIndex();
 
     Crypto::Hash hash;
 
