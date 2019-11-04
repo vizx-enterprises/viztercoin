@@ -149,6 +149,7 @@ RpcServer::RpcServer(
             .Post("/get_pool_changes_lite", router(&RpcServer::getPoolChanges, RpcMode::Default, bodyRequired))
             .Post("/queryblocksdetailed", router(&RpcServer::queryBlocksDetailed, RpcMode::AllMethodsEnabled, bodyRequired))
             .Post("/get_o_indexes", router(&RpcServer::getGlobalIndexesDeprecated, RpcMode::Default, bodyRequired))
+            .Post("/getrawblocks", router(&RpcServer::getRawBlocks, RpcMode::Default, bodyRequired))
 
             /* Matches everything */
             /* NOTE: Not passing through middleware */
@@ -3054,3 +3055,113 @@ std::tuple<Error, uint16_t> RpcServer::getGlobalIndexesDeprecated(
 
     return {SUCCESS, 200};
 }
+
+std::tuple<Error, uint16_t> RpcServer::getRawBlocks(
+    const httplib::Request &req,
+    httplib::Response &res,
+    const rapidjson::Document &body)
+{
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+
+    writer.StartObject();
+
+    std::vector<Crypto::Hash> blockHashCheckpoints;
+
+    if (hasMember(body, "blockHashCheckpoints"))
+    {
+        for (const auto &jsonHash : getArrayFromJSON(body, "blockHashCheckpoints"))
+        {
+            std::string hashStr = jsonHash.GetString();
+
+            Crypto::Hash hash;
+            Common::podFromHex(hashStr, hash);
+
+            blockHashCheckpoints.push_back(hash);
+        }
+    }
+
+    const uint64_t startHeight = hasMember(body, "startHeight")
+        ? getUint64FromJSON(body, "startHeight")
+        : 0;
+
+    const uint64_t startTimestamp = hasMember(body, "startTimestamp")
+        ? getUint64FromJSON(body, "startTimestamp")
+        : 0;
+
+    const uint64_t blockCount = hasMember(body, "blockCount")
+        ? getUint64FromJSON(body, "blockCount")
+        : 100;
+
+    const bool skipCoinbaseTransactions = hasMember(body, "skipCoinbaseTransactions")
+        ? getBoolFromJSON(body, "skipCoinbaseTransactions")
+        : false;
+
+    std::vector<CryptoNote::RawBlock> blocks;
+    std::optional<WalletTypes::TopBlock> topBlockInfo;
+
+    const bool success = m_core->getRawBlocks(
+        blockHashCheckpoints,
+        startHeight,
+        startTimestamp,
+        blockCount,
+        skipCoinbaseTransactions,
+        blocks,
+        topBlockInfo
+    );
+
+    if (!success)
+    {
+        return {SUCCESS, 500};
+    }
+
+    writer.Key("items");
+    writer.StartArray();
+    {
+        for (const auto &block : blocks)
+        {
+            writer.StartObject();
+
+            writer.Key("block");
+            writer.String(Common::toHex(block.block));
+
+            writer.Key("transactions");
+            writer.StartArray();
+            for (const auto &transaction : block.transactions)
+            {
+                writer.String(Common::toHex(transaction));
+            }
+            writer.EndArray();
+
+            writer.EndObject();
+        }
+    }
+    writer.EndArray();
+
+    if (topBlockInfo)
+    {
+        writer.Key("topBlock");
+        writer.StartObject();
+        {
+            writer.Key("hash");
+            writer.String(Common::podToHex(topBlockInfo->hash));
+
+            writer.Key("height");
+            writer.Uint64(topBlockInfo->height);
+        }
+        writer.EndObject();
+    }
+
+    writer.Key("synced");
+    writer.Bool(blocks.empty());
+
+    writer.Key("status");
+    writer.String("OK");
+
+    writer.EndObject();
+
+    res.body = sb.GetString();
+
+    return {SUCCESS, 200};
+}
+

@@ -102,6 +102,15 @@ namespace CryptoNote
             std::vector<WalletTypes::WalletBlockInfo> &blocks,
             std::optional<WalletTypes::TopBlock> &topBlockInfo) const = 0;
 
+        virtual bool getRawBlocks(
+            const std::vector<Crypto::Hash> &knownBlockHashes,
+            const uint64_t startHeight,
+            const uint64_t startTimestamp,
+            const uint64_t blockCount,
+            const bool skipCoinbaseTransactions,
+            std::vector<RawBlock> &walletBlocks,
+            std::optional<WalletTypes::TopBlock> &topBlockInfo) const = 0;
+
         virtual bool getTransactionsStatus(
             std::unordered_set<Crypto::Hash> transactionHashes,
             std::unordered_set<Crypto::Hash> &transactionsInPool,

@@ -144,6 +144,9 @@ class RpcServer
     std::tuple<Error, uint16_t>
         getGlobalIndexesDeprecated(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
 
+    std::tuple<Error, uint16_t>
+        getRawBlocks(const httplib::Request &req, httplib::Response &res, const rapidjson::Document &body);
+
     ///////////////////////
     /* JSON RPC REQUESTS */
     ///////////////////////

@@ -849,6 +849,123 @@ namespace CryptoNote
         }
     }
 
+    /* Known block hashes = The hashes the wallet knows about. We'll give blocks starting from this hash.
+       Timestamp = The timestamp to start giving blocks from, if knownBlockHashes is empty. Used for syncing a new
+       wallet. walletBlocks = The returned vector of blocks */
+    bool Core::getRawBlocks(
+        const std::vector<Crypto::Hash> &knownBlockHashes,
+        const uint64_t startHeight,
+        const uint64_t startTimestamp,
+        const uint64_t blockCount,
+        const bool skipCoinbaseTransactions,
+        std::vector<RawBlock> &blocks,
+        std::optional<WalletTypes::TopBlock> &topBlockInfo) const
+    {
+        throwIfNotInitialized();
+
+        try
+        {
+            IBlockchainCache *mainChain = chainsLeaves[0];
+
+            /* Current height */
+            uint64_t currentIndex = mainChain->getTopBlockIndex();
+            Crypto::Hash currentHash = mainChain->getTopBlockHash();
+
+            uint64_t actualBlockCount = std::min(BLOCKS_SYNCHRONIZING_DEFAULT_COUNT, blockCount);
+
+            if (actualBlockCount == 0)
+            {
+                actualBlockCount = BLOCKS_SYNCHRONIZING_DEFAULT_COUNT;
+            }
+
+            auto [success, timestampBlockHeight] = mainChain->getBlockHeightForTimestamp(startTimestamp);
+
+            /* If no timestamp given, occasionaly the daemon returns a non zero
+           block height... for some reason. Set it back to zero if we didn't
+           give a timestamp to fix this. */
+            if (startTimestamp == 0)
+            {
+                timestampBlockHeight = 0;
+            }
+
+            /* If we couldn't get the first block timestamp, then the node is
+           synced less than the current height, so return no blocks till we're
+           synced. */
+            if (startTimestamp != 0 && !success)
+            {
+                topBlockInfo = WalletTypes::TopBlock({currentHash, currentIndex});
+                return true;
+            }
+
+            /* If a height was given, start from there, else convert the timestamp
+           to a block */
+            uint64_t firstBlockHeight = startHeight == 0 ? timestampBlockHeight : startHeight;
+
+            /* The height of the last block we know about */
+            uint64_t lastKnownBlockHashHeight = static_cast<uint64_t>(findBlockchainSupplement(knownBlockHashes));
+
+            /* Start returning either from the start height, or the height of the
+           last block we know about, whichever is higher */
+            uint64_t startIndex = std::max(
+                /* Plus one so we return the next block - default to zero if it's zero,
+           otherwise genesis block will be skipped. */
+                lastKnownBlockHashHeight == 0 ? 0 : lastKnownBlockHashHeight + 1,
+                firstBlockHeight);
+
+            /* Difference between the start and end */
+            uint64_t blockDifference = currentIndex - startIndex;
+
+            /* Sync actualBlockCount or the amount of blocks between
+           start and end, whichever is smaller */
+            uint64_t endIndex = std::min(actualBlockCount, blockDifference + 1) + startIndex;
+
+            logger(Logging::DEBUGGING) << "\n\n"
+                                       << "\n============================================="
+                                       << "\n========= GetRawBlocks summary ========="
+                                       << "\n* Known block hashes size: " << knownBlockHashes.size()
+                                       << "\n* Blocks requested: " << actualBlockCount
+                                       << "\n* Start height: " << startHeight
+                                       << "\n* Start timestamp: " << startTimestamp
+                                       << "\n* Current index: " << currentIndex
+                                       << "\n* Timestamp block height: " << timestampBlockHeight
+                                       << "\n* First block height: " << firstBlockHeight
+                                       << "\n* Last known block hash height: " << lastKnownBlockHashHeight
+                                       << "\n* Start index: " << startIndex
+                                       << "\n* Block difference: " << blockDifference << "\n* End index: " << endIndex
+                                       << "\n============================================="
+                                       << "\n\n\n";
+
+            /* If we're fully synced, then the start index will be greater than our
+           current block. */
+            if (currentIndex < startIndex)
+            {
+                topBlockInfo = WalletTypes::TopBlock({currentHash, currentIndex});
+                return true;
+            }
+
+            if (skipCoinbaseTransactions)
+            {
+                blocks = mainChain->getNonEmptyBlocks(startIndex, actualBlockCount);
+            }
+            else
+            {
+                blocks = mainChain->getBlocksByHeight(startIndex, endIndex);
+            }
+
+            if (blocks.empty())
+            {
+                topBlockInfo = WalletTypes::TopBlock({currentHash, currentIndex});
+            }
+
+            return true;
+        }
+        catch (std::exception &e)
+        {
+            logger(Logging::ERROR) << "Failed to get wallet sync data: " << e.what();
+            return false;
+        }
+    }
+
     WalletTypes::RawCoinbaseTransaction Core::getRawCoinbaseTransaction(const CryptoNote::Transaction &t)
     {
         WalletTypes::RawCoinbaseTransaction transaction;
