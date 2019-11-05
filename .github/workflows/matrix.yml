@@ -110,17 +110,20 @@ jobs:
       MSBUILD_PATH: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin"
     steps:
       - uses: actions/checkout@v1
+      
+      - name: Setup MSBuild.exe
+        uses: warrenbuckley/Setup-MSBuild@v1
 
       # Configure project with cmake
       - name: Configure
         run: |
-          mkdir build && cd build
+          mkdir build
+          cd build
           cmake -G "Visual Studio 16 2019" -A x64 .. -DARCH=default
       
       # Build for Windows
       - name: Build
         run: |
-          set PATH=%MSBUILD_PATH%;%PATH%
           cd build
           MSBuild TurtleCoin.sln /p:Configuration=Release /m
       

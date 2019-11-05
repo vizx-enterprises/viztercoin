@@ -61,11 +61,26 @@ DaemonCommandsHandler::DaemonCommandsHandler(
     m_logManager(log),
     m_rpcServer(std::get<0>(prpc_server->getConnectionInfo()).c_str(), std::get<1>(prpc_server->getConnectionInfo()))
 {
-    m_consoleHandler.setHandler("exit", std::bind(&DaemonCommandsHandler::exit, this, std::placeholders::_1), "Shutdown the daemon");
-    m_consoleHandler.setHandler("help", std::bind(&DaemonCommandsHandler::help, this, std::placeholders::_1), "Show this help");
-    m_consoleHandler.setHandler("print_pl", std::bind(&DaemonCommandsHandler::print_pl, this, std::placeholders::_1), "Print peer list");
     m_consoleHandler.setHandler(
-        "print_cn", std::bind(&DaemonCommandsHandler::print_cn, this, std::placeholders::_1), "Print connections");
+        "?",
+        std::bind(&DaemonCommandsHandler::help, this, std::placeholders::_1),
+        "Show this help");
+    m_consoleHandler.setHandler(
+        "exit",
+        std::bind(&DaemonCommandsHandler::exit, this, std::placeholders::_1),
+        "Shutdown the daemon");
+    m_consoleHandler.setHandler(
+        "help",
+        std::bind(&DaemonCommandsHandler::help, this, std::placeholders::_1),
+        "Show this help");
+    m_consoleHandler.setHandler(
+        "print_pl",
+        std::bind(&DaemonCommandsHandler::print_pl, this, std::placeholders::_1),
+        "Print peer list");
+    m_consoleHandler.setHandler(
+        "print_cn",
+        std::bind(&DaemonCommandsHandler::print_cn, this, std::placeholders::_1),
+        "Print connections");
     m_consoleHandler.setHandler(
         "print_block",
         std::bind(&DaemonCommandsHandler::print_block, this, std::placeholders::_1),
@@ -86,7 +101,10 @@ DaemonCommandsHandler::DaemonCommandsHandler(
         "set_log",
         std::bind(&DaemonCommandsHandler::set_log, this, std::placeholders::_1),
         "set_log <level> - Change current log level, <level> is a number 0-4");
-    m_consoleHandler.setHandler("status", std::bind(&DaemonCommandsHandler::status, this, std::placeholders::_1), "Show daemon status");
+    m_consoleHandler.setHandler(
+        "status",
+        std::bind(&DaemonCommandsHandler::status, this, std::placeholders::_1),
+        "Show daemon status");
 }
 
 //--------------------------------------------------------------------------------
@@ -296,7 +314,7 @@ bool DaemonCommandsHandler::print_pool_sh(const std::vector<std::string> &args)
     uint64_t totalSize = 0;
 
     const float maxTxSize = Utilities::getMaxTxSize(m_core.getTopBlockIndex());
-    
+
     for (const auto &tx : pool)
     {
         CryptoNote::CachedTransaction ctx(tx);
@@ -381,6 +399,7 @@ bool DaemonCommandsHandler::status(const std::vector<std::string> &args)
     statusTable.push_back({"Fork Status",           Utilities::get_update_status(forkStatus)});
     statusTable.push_back({"Next Fork",             Utilities::get_fork_time(networkHeight, upgradeHeights)});
     statusTable.push_back({"Transaction Pool Size", std::to_string(m_core.getPoolTransactionHashes().size())});
+    statusTable.push_back({"Version", PROJECT_VERSION});
 
     size_t longestValue = 0;
     size_t longestDescription = 0;
