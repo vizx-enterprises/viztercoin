@@ -102,9 +102,9 @@ ZedConfig parseArguments(int argc, char **argv)
         exit(0);
     }
 
-    if (logLevel < Logger::DEBUG || logLevel > Logger::TRACE)
+    if (logLevel < Logger::DISABLED || logLevel > Logger::TRACE)
     {
-        std::cout << "Log level must be between " << Logger::TRACE << " and " << Logger::DEBUG << "!" << std::endl;
+        std::cout << "Log level must be between " << Logger::DISABLED << " and " << Logger::TRACE << "!" << std::endl;
         exit(1);
     }
     else
