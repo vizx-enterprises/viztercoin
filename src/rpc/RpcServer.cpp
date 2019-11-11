@@ -246,7 +246,7 @@ void RpcServer::middleware(
         const rapidjson::Document &body)> handler)
 {
     Logger::logger.log(
-        "Incoming " + req.method + " request: " + req.path,
+        "Incoming " + req.method + " request: " + req.path + ", User-Agent: " + req.get_header_value("User-Agent"),
         Logger::DEBUG,
         { Logger::DAEMON_RPC }
     );
