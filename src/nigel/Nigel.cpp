@@ -110,7 +110,6 @@ void Nigel::resetRequestedBlockCount()
 
 std::tuple<bool, std::vector<WalletTypes::WalletBlockInfo>, std::optional<WalletTypes::TopBlock>>
     Nigel::getWalletSyncData(
-
         const std::vector<Crypto::Hash> blockHashCheckpoints,
         const uint64_t startHeight,
         const uint64_t startTimestamp,
@@ -123,6 +122,11 @@ std::tuple<bool, std::vector<WalletTypes::WalletBlockInfo>, std::optional<Wallet
               {"startTimestamp", startTimestamp},
               {"blockCount", m_blockCount.load()},
               {"skipCoinbaseTransactions", skipCoinbaseTransactions}};
+    Logger::logger.log(
+        "Sending /getwalletsyncdata request to daemon: " + j.dump(),
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
 
     auto res = m_nodeClient->Post("/getwalletsyncdata", m_requestHeaders, j.dump(), "application/json");
 
@@ -178,6 +182,12 @@ bool Nigel::getDaemonInfo()
 {
     Logger::logger.log("Updating daemon info", Logger::DEBUG, {Logger::SYNC, Logger::DAEMON});
 
+    Logger::logger.log(
+        "Sending /info request to daemon",
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
+
     auto res = m_nodeClient->Get("/info", m_requestHeaders);
 
     const auto parsedResponse = tryParseJSONResponse(res, "Failed to update daemon info", [this](const nlohmann::json j) {
@@ -220,6 +230,12 @@ bool Nigel::getDaemonInfo()
 bool Nigel::getFeeInfo()
 {
     Logger::logger.log("Fetching fee info", Logger::DEBUG, {Logger::DAEMON});
+
+    Logger::logger.log(
+        "Sending /fee request to daemon",
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
 
     auto res = m_nodeClient->Get("/fee", m_requestHeaders);
 
@@ -297,6 +313,12 @@ bool Nigel::getTransactionsStatus(
 {
     json j = {{"transactionHashes", transactionHashes}};
 
+    Logger::logger.log(
+        "Sending /get_transactions_status request to daemon: " + j.dump(),
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
+
     auto res = m_nodeClient->Post("/get_transactions_status", m_requestHeaders, j.dump(), "application/json");
 
     const auto parsedResponse = tryParseJSONResponse(res, "Failed to get transactions status", [&](const nlohmann::json j) {
@@ -322,6 +344,12 @@ std::tuple<bool, std::vector<CryptoNote::RandomOuts>>
         j.erase("outs_count");
         j["mixin"] = requestedOuts;
 
+        Logger::logger.log(
+            "Sending /randomOutputs request to daemon: " + j.dump(),
+            Logger::TRACE,
+            { Logger::SYNC, Logger::DAEMON }
+        );
+
         /* We also need to handle the request and response a bit
            differently so we'll do this here */
         auto res = m_nodeClient->Post("/randomOutputs", m_requestHeaders, j.dump(), "application/json");
@@ -337,6 +365,12 @@ std::tuple<bool, std::vector<CryptoNote::RandomOuts>>
     }
     else
     {
+        Logger::logger.log(
+            "Sending /getrandom_outs request to daemon: " + j.dump(),
+            Logger::TRACE,
+            { Logger::SYNC, Logger::DAEMON }
+        );
+
         auto res = m_nodeClient->Post("/getrandom_outs", m_requestHeaders, j.dump(), "application/json");
 
         const auto parsedResponse = tryParseJSONResponse(res, "Failed to get random outs", [](const nlohmann::json j) {
@@ -355,6 +389,12 @@ std::tuple<bool, std::vector<CryptoNote::RandomOuts>>
 std::tuple<bool, bool, std::string> Nigel::sendTransaction(const CryptoNote::Transaction tx) const
 {
     json j = {{"tx_as_hex", Common::toHex(CryptoNote::toBinaryArray(tx))}};
+
+    Logger::logger.log(
+        "Sending /sendrawtransaction request to daemon: " + j.dump(),
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
 
     auto res = m_nodeClient->Post("/sendrawtransaction", m_requestHeaders, j.dump(), "application/json");
 
@@ -390,6 +430,12 @@ std::tuple<bool, std::unordered_map<Crypto::Hash, std::vector<uint64_t>>>
     }
 
     json j = {{"startHeight", startHeight}, {"endHeight", endHeight}};
+
+    Logger::logger.log(
+        "Sending /get_global_indexes_for_range request to daemon: " + j.dump(),
+        Logger::TRACE,
+        { Logger::SYNC, Logger::DAEMON }
+    );
 
     auto res = m_nodeClient->Post("/get_global_indexes_for_range", m_requestHeaders, j.dump(), "application/json");
 

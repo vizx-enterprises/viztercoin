@@ -109,6 +109,12 @@ class Nigel
                 {
                     nlohmann::json j = nlohmann::json::parse(res->body);
 
+                    Logger::logger.log(
+                        "Got response from daemon: " + j.dump(),
+                        Logger::TRACE,
+                        { Logger::SYNC, Logger::DAEMON }
+                    );
+
                     const std::string status = j.at("status").get<std::string>();
 
                     if (verifyStatus && status != "OK")
