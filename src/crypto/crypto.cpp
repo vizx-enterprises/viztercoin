@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 namespace Crypto
 {
@@ -636,6 +637,50 @@ namespace Crypto
         keccak((uint8_t *)&spend, sizeof(spend), (uint8_t *)&viewKeySeed, sizeof(viewKeySeed));
 
         Crypto::generate_deterministic_keys(viewPublic, viewSecret, viewKeySeed);
+    }
+
+    void crypto_ops::generate_deterministic_subwallet_key(
+        const Crypto::SecretKey &baseSpend,
+        uint64_t subwalletIndex,
+        Crypto::SecretKey &subSpend)
+    {
+        /* Set the iterations for key stretching to the subwallet index number */
+        const uint64_t iterations = subwalletIndex;
+
+        /* Convert the subwallet index number into a binary arrary for ease of
+           appending to the key as the salt */
+        std::vector<uint8_t> subwalletSalt(8);
+
+        std::memcpy(subwalletSalt.data(), &subwalletIndex, sizeof(subwalletIndex));
+
+        /* Our new spend key starts as just the key that was supplied */
+        subSpend = baseSpend;
+
+        /* Loop through the iteration count and stretch this key */
+        for (size_t i = 0; i < iterations; i++)
+        {
+            /* Copy the existing new spend key into a new binary array for
+               further manipulation */
+            std::vector<uint8_t> newKey;
+
+            std::copy(std::begin(subSpend.data), std::end(subSpend.data), std::back_inserter(newKey));
+
+            /* Append our salt (the subwallet index as defined above to the key information */
+            std::copy(subwalletSalt.begin(), subwalletSalt.end(), std::back_inserter(newKey));
+
+            /* Hash that new key data with cn_fast_hash to make it computationally
+               infeasible to reverse */
+            Crypto::Hash hash;
+
+            cn_fast_hash(newKey.data(), newKey.size(), hash);
+
+            /* The resulting hash is our new spend key before scalar reduction */
+            subSpend = hash.data;
+        }
+
+        /* Run the resulting key through scalar reduction to make sure we have a good
+           private key that is returned to the caller */
+        sc_reduce32(reinterpret_cast<unsigned char *>(&subSpend));
     }
 
 } // namespace Crypto
