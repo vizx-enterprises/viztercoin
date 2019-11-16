@@ -610,11 +610,34 @@ inline bool wait_until_socket_is_ready(socket_t sock, time_t sec, time_t usec)
 }
 
 template <typename T>
-inline bool read_socket(socket_t sock, size_t keep_alive_max_count, T callback, bool close)
+inline bool read_socket(
+    socket_t sock,
+    size_t keep_alive_max_count,
+    T callback,
+    bool close,
+    bool keepAliveForever = false)
 {
     bool ret = false;
 
-    if (keep_alive_max_count > 0) {
+    if (keepAliveForever)
+    {
+        while (detail::select_read(sock,
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND,
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0)
+        {
+            SocketStream strm(sock);
+
+            bool closeConnection = false;
+
+            ret = callback(strm, false, closeConnection);
+
+            if (!ret || closeConnection)
+            {
+                break;
+            }
+        }
+    }
+    else if (keep_alive_max_count > 0) {
         auto count = keep_alive_max_count;
         while (count > 0 &&
                detail::select_read(sock,
@@ -2335,7 +2358,8 @@ inline bool Server::read_socket(socket_t sock)
         [this](Stream& strm, bool last_connection, bool& connection_close) {
             return process_request(strm, last_connection, connection_close);
         },
-        close);
+        close,
+        true);
 }
 
 // HTTP client implementation
@@ -2365,7 +2389,7 @@ inline socket_t Client::create_client_socket()
         return opened_connection_;
     }
 
-    auto [opened_connection_, err] = detail::create_socket(host_.c_str(), port_,
+    auto [conn, err] = detail::create_socket(host_.c_str(), port_,
         [=](socket_t sock, struct addrinfo& ai) -> SocketError {
             detail::set_nonblocking(sock, true);
 
@@ -2381,6 +2405,8 @@ inline socket_t Client::create_client_socket()
             detail::set_nonblocking(sock, false);
             return SUCCESS;
         });
+
+    opened_connection_ = conn;
 
     return opened_connection_;
 }
@@ -2685,7 +2711,8 @@ inline bool read_socket_ssl(
     SSL_CTX* ctx, std::mutex& ctx_mutex,
     U SSL_connect_or_accept, V setup,
     T callback,
-    bool close)
+    bool close,
+    bool keepAliveForever = false)
 {
     SSL* ssl = nullptr;
     {
@@ -2706,7 +2733,25 @@ inline bool read_socket_ssl(
 
     bool ret = false;
 
-    if (keep_alive_max_count > 0) {
+    if (keepAliveForever)
+    {
+        while (detail::select_read(sock,
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND,
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0)
+        {
+            SSLSocketStream strm(sock, ssl);
+
+            bool closeConnection = false;
+
+            ret = callback(strm, false, closeConnection);
+
+            if (!ret || closeConnection)
+            {
+                break;
+            }
+        }
+    }
+    else if (keep_alive_max_count > 0) {
         auto count = keep_alive_max_count;
         while (count > 0 &&
                detail::select_read(sock,
@@ -2833,7 +2878,8 @@ inline bool SSLServer::read_socket(socket_t sock)
         [this](Stream& strm, bool last_connection, bool& connection_close) {
             return process_request(strm, last_connection, connection_close);
         },
-        close);
+        close,
+        true);
 }
 
 // SSL HTTP client implementation
