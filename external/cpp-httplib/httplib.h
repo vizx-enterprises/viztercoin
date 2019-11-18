@@ -90,7 +90,7 @@ typedef int socket_t;
 /*
  * Configuration
  */
-#define CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND 5
+#define CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND 30
 #define CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND 0
 
 namespace httplib
