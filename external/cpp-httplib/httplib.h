@@ -352,6 +352,7 @@ private:
     bool write_request(Stream& strm, Request& req);
 
     virtual bool read_socket(socket_t sock, Request& req, Response& res);
+    virtual bool is_ssl() const;
 };
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
@@ -399,6 +400,7 @@ public:
 
 private:
     virtual bool read_socket(socket_t sock, Request& req, Response& res);
+    virtual bool is_ssl() const;
 
     SSL_CTX* ctx_;
     std::mutex ctx_mutex_;
@@ -2406,9 +2408,14 @@ inline socket_t Client::create_client_socket()
             return SUCCESS;
         });
 
-    opened_connection_ = conn;
+    /* For some reason, reusing the connection fails when using SSL. Possibly
+     * need to reinitialize the connection or something. For now, just disabling. */
+    if (!is_ssl())
+    {
+        opened_connection_ = conn;
+    }
 
-    return opened_connection_;
+    return conn;
 }
 
 inline bool Client::read_response_line(Stream& strm, Response& res)
@@ -2562,6 +2569,11 @@ inline bool Client::read_socket(socket_t sock, Request& req, Response& res)
             return process_request(strm, req, res, connection_close);
         },
         close);
+}
+
+inline bool Client::is_ssl() const
+{
+    return false;
 }
 
 inline std::shared_ptr<Response> Client::Get(const std::string &path, Progress progress)
@@ -2899,6 +2911,11 @@ inline SSLClient::~SSLClient()
 inline bool SSLClient::is_valid() const
 {
     return ctx_;
+}
+
+inline bool SSLClient::is_ssl() const
+{
+    return true;
 }
 
 inline bool SSLClient::read_socket(socket_t sock, Request& req, Response& res)
