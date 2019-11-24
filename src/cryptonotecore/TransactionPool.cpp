@@ -21,7 +21,7 @@ namespace CryptoNote
         /* We want to work out if fee per byte(lhs) is greater than fee per byte(rhs).
          * Fee per byte is calculated by (lhs.fee / lhs.size) > (rhs.fee / rhs.size).
          * We can rearrange this to (lhs.fee * rhs.size) > (rhs.fee * lhs.size),
-         * which is a little quicker to execute. Since the results is a 128
+         * which is a little quicker to execute. Since the result is a 128
          * bit multiplication, we store the result in two uint64's. */
         uint64_t lhs_hi, lhs_lo = mul128(left.getTransactionFee(), right.getTransactionBinaryArray().size(), &lhs_hi);
         uint64_t rhs_hi, rhs_lo = mul128(right.getTransactionFee(), left.getTransactionBinaryArray().size(), &rhs_hi);
@@ -98,7 +98,7 @@ namespace CryptoNote
         {
             return true;
         }
-        else if (rhs.receiveTime > lhs.receiveTime)
+        else if (rhs.receiveTime < lhs.receiveTime)
         {
             return false;
         }
