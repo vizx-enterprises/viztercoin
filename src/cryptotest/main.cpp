@@ -292,11 +292,7 @@ void TestDeterministicSubwalletCreation (const std::string baseSpendKey, const u
         exit(1);
     }
 
-    Crypto::SecretKey subwalletPrivateKey;
-
-    Crypto::PublicKey subwalletPublicKey;
-
-    Crypto::generate_deterministic_subwallet_keys(f_baseSpendKey, subWalletIndex, subwalletPrivateKey, subwalletPublicKey);
+    const auto [subwalletPrivateKey, subwalletPublicKey] = Crypto::generate_deterministic_subwallet_keys(f_baseSpendKey, subWalletIndex);
 
     if (subwalletPrivateKey != f_expectedSpendKey)
     {

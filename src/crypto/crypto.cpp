@@ -653,34 +653,33 @@ namespace Crypto
 
         std::memcpy(subwalletSalt.data(), &subwalletIndex, sizeof(subwalletIndex));
 
-        /* Our new spend key starts as just the key that was supplied */
-        subSpend = baseSpend;
+        /* Set up our temporary key as 32 byte key + 8 byte wallet index */
+        std::vector<uint8_t> tmpKey(40);
+
+        /* Copy our base key into the vector */
+        std::copy(std::begin(baseSpend.data), std::end(baseSpend.data), tmpKey.begin());
 
         /* Loop through the iteration count and stretch this key */
-        for (size_t i = 0; i < iterations; i++)
+        for (uint64_t i = 0; i < iterations; i++)
         {
-            /* Copy the existing new spend key into a new binary array for
-               further manipulation */
-            std::vector<uint8_t> newKey;
+            /* Copy our wallet index on to the end of the temporary key vector
+               to salt the input to the hashing method */
+            std::copy(subwalletSalt.begin(), subwalletSalt.end(), tmpKey.begin() + 32);
 
-            std::copy(std::begin(subSpend.data), std::end(subSpend.data), std::back_inserter(newKey));
+            /* Hash the binary array */
+            Hash h;
 
-            /* Append our salt (the subwallet index as defined above to the key information */
-            std::copy(subwalletSalt.begin(), subwalletSalt.end(), std::back_inserter(newKey));
+            cn_fast_hash(tmpKey.data(), tmpKey.size(), h);
 
-            /* Hash that new key data with cn_fast_hash to make it computationally
-               infeasible to reverse */
-            Crypto::Hash hash;
-
-            cn_fast_hash(newKey.data(), newKey.size(), hash);
-
-            /* The resulting hash is our new spend key before scalar reduction */
-            subSpend = hash.data;
+            /* Copy the hash back into the tmpKey vector */
+            std::copy(std::begin(h.data), std::end(h.data), tmpKey.begin());
         }
+
+        std::copy(tmpKey.begin(), tmpKey.begin() + 32, subSpend.data);
 
         /* Run the resulting key through scalar reduction to make sure we have a good
            private key that is returned to the caller */
-        sc_reduce32(reinterpret_cast<unsigned char *>(&subSpend));
+        sc_reduce32(reinterpret_cast<unsigned char *>(&subSpend.data));
     }
 
 } // namespace Crypto

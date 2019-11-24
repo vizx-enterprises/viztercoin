@@ -92,29 +92,27 @@ std::tuple<Error, std::string, Crypto::SecretKey, uint64_t> SubWallets::addSubWa
 
     std::scoped_lock lock(m_mutex);
 
-    CryptoNote::KeyPair spendKey;
-
     /* Generate a deterministic secret spend key for the next deterministic wallet */
-    Crypto::generate_deterministic_subwallet_keys(primarySpendKey, ++m_subWalletIndexCounter, spendKey.secretKey, spendKey.publicKey);
+    const auto [newPrivateKey, newPublicKey] = Crypto::generate_deterministic_subwallet_keys(primarySpendKey, ++m_subWalletIndexCounter);
 
-    const std::string address = Utilities::privateKeysToAddress(spendKey.secretKey, m_privateViewKey);
+    const std::string address = Utilities::privateKeysToAddress(newPrivateKey, m_privateViewKey);
 
     const bool isPrimaryAddress = false;
 
     const uint64_t scanHeight = 0;
 
-    m_subWallets[spendKey.publicKey] = SubWallet(
-        spendKey.publicKey,
-        spendKey.secretKey,
+    m_subWallets[newPublicKey] = SubWallet(
+        newPublicKey,
+        newPrivateKey,
         address,
         scanHeight,
         Utilities::getCurrentTimestampAdjusted(),
         isPrimaryAddress,
         m_subWalletIndexCounter);
 
-    m_publicSpendKeys.push_back(spendKey.publicKey);
+    m_publicSpendKeys.push_back(newPublicKey);
 
-    return {SUCCESS, address, spendKey.secretKey, m_subWalletIndexCounter};
+    return {SUCCESS, address, newPrivateKey, m_subWalletIndexCounter};
 }
 
 std::tuple<Error, std::string>
@@ -162,12 +160,10 @@ std::tuple<Error, std::string>
 
     Crypto::SecretKey primarySpendKey = getPrimaryPrivateSpendKey();
 
-    CryptoNote::KeyPair spendKey;
-
     /* Generate a deterministic secret spend key using the given wallet index */
-    Crypto::generate_deterministic_subwallet_keys(primarySpendKey, walletIndex, spendKey.secretKey, spendKey.publicKey);
+    const auto [newPrivateKey, newPublicKey] = Crypto::generate_deterministic_subwallet_keys(primarySpendKey, walletIndex);
 
-    const auto [status, address] = importSubWallet(spendKey.secretKey, scanHeight);
+    const auto [status, address] = importSubWallet(newPrivateKey, scanHeight);
 
     if (status == SUCCESS && walletIndex > m_subWalletIndexCounter)
     {
