@@ -11,47 +11,101 @@
 
 namespace CryptoNote
 {
-    // lhs > hrs
+    /* Is the left hand side preferred over the right hand side? */
     bool TransactionPool::TransactionPriorityComparator::
         operator()(const PendingTransactionInfo &lhs, const PendingTransactionInfo &rhs) const
     {
         const CachedTransaction &left = lhs.cachedTransaction;
         const CachedTransaction &right = rhs.cachedTransaction;
 
-        // price(lhs) = lhs.fee / lhs.blobSize
-        // price(lhs) > price(rhs) -->
-        // lhs.fee / lhs.blobSize > rhs.fee / rhs.blobSize -->
-        // lhs.fee * rhs.blobSize > rhs.fee * lhs.blobSize
+        /* We want to work out if fee per byte(lhs) is greater than fee per byte(rhs).
+         * Fee per byte is calculated by (lhs.fee / lhs.size) > (rhs.fee / rhs.size).
+         * We can rearrange this to (lhs.fee * rhs.size) > (rhs.fee * lhs.size),
+         * which is a little quicker to execute. Since the results is a 128
+         * bit multiplication, we store the result in two uint64's. */
         uint64_t lhs_hi, lhs_lo = mul128(left.getTransactionFee(), right.getTransactionBinaryArray().size(), &lhs_hi);
         uint64_t rhs_hi, rhs_lo = mul128(right.getTransactionFee(), left.getTransactionBinaryArray().size(), &rhs_hi);
 
-        const auto lhs_ratio = left.getTransaction().inputs.size() / left.getTransaction().outputs.size();
-        const auto rhs_ratio = right.getTransaction().inputs.size() / left.getTransaction().outputs.size();
+        /* If the left hand side high bits are greater than the right hand
+         * side high bits, or the high bits are equal and the left hand side
+         * low bits are equal, then the lhs is larger. */
+        const bool rightHandSideMoreProfitable
+            = lhs_hi > rhs_hi || (lhs_hi == rhs_hi && lhs_lo > rhs_lo);
 
-        const auto lhs_amount = left.getTransactionAmount();
-        const auto rhs_amount = right.getTransactionAmount();
+        const bool leftHandSideMoreProfitable
+            = rhs_hi > lhs_hi || (lhs_hi == rhs_hi && rhs_lo > lhs_lo);
 
-        return
-            // prefer more profitable transactions
-            (lhs_hi > rhs_hi) || (lhs_hi == rhs_hi && lhs_lo > rhs_lo) ||
-            // prefer those with a higher aggregate transferred amount
-            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
-             && lhs_amount > rhs_amount) ||
-            // prefer those with a higher input to output ratio
-            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
-             && lhs_amount == rhs_amount
-             && lhs_ratio > rhs_ratio) ||
-            // prefer smaller (bytes)
-            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
-             && lhs_amount == rhs_amount
-             && lhs_ratio == rhs_ratio
-             && left.getTransactionBinaryArray().size() < right.getTransactionBinaryArray().size()) ||
-            // prefer older
-            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
-             && lhs_amount == rhs_amount
-             && lhs_ratio == rhs_ratio
-             && left.getTransactionBinaryArray().size() == right.getTransactionBinaryArray().size()
-             && lhs.receiveTime < rhs.receiveTime);
+        /* First sort by profitability, fee per byte, higher fee per byte preferred */
+        if (rightHandSideMoreProfitable)
+        {
+            return true;
+        }
+        else if (leftHandSideMoreProfitable)
+        {
+            return false;
+        }
+
+        const uint64_t leftAmount = left.getTransactionAmount();
+        const uint64_t rightAmount = right.getTransactionAmount();
+
+        /* Next sort by total amount transferred, larger amounts preferred */
+        if (leftAmount > rightAmount)
+        {
+            return true;
+        }
+        else if (rightAmount > leftAmount)
+        {
+            return false;
+        }
+
+        /* Figure out the ratio of inputs to outputs, ensuring we don't divide
+         * by zero. */
+        const double leftInputOutputRatio = left.getTransaction().outputs.size() == 0
+            ? std::numeric_limits<double>::max()
+            : left.getTransaction().inputs.size() / left.getTransaction().outputs.size();
+
+        const double rightInputOutputRatio = right.getTransaction().outputs.size() == 0
+            ? std::numeric_limits<double>::max()
+            : right.getTransaction().inputs.size() / right.getTransaction().outputs.size();
+
+        /* Next sort by ratio of inputs to outputs, higher ratio preferred
+         * (Less outputs = more 'optimized' transaction). */
+        if (leftInputOutputRatio > rightInputOutputRatio)
+        {
+            return true;
+        }
+        else if (rightInputOutputRatio > leftInputOutputRatio)
+        {
+            return false;
+        }
+
+        const size_t leftSize = left.getTransactionBinaryArray().size();
+        const size_t rightSize = right.getTransactionBinaryArray().size();
+
+        /* Next sort by size of transaction, smaller transactions preferred. */
+        if (leftSize < rightSize)
+        {
+            return true;
+        }
+        else if (rightSize < leftSize)
+        {
+            return false;
+        }
+
+        /* Next, prefer older transactions. receiveTime is a unix timestamp,
+         * so smaller = older. */
+        if (lhs.receiveTime < rhs.receiveTime)
+        {
+            return true;
+        }
+        else if (rhs.receiveTime > lhs.receiveTime)
+        {
+            return false;
+        }
+
+        /* Everything is the same! Return true because we've gotta return
+         * something.. */
+        return true;
     }
 
     const Crypto::Hash &TransactionPool::PendingTransactionInfo::getTransactionHash() const
