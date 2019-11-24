@@ -28,20 +28,27 @@ namespace CryptoNote
         const auto lhs_ratio = left.getTransaction().inputs.size() / left.getTransaction().outputs.size();
         const auto rhs_ratio = right.getTransaction().inputs.size() / left.getTransaction().outputs.size();
 
+        const auto lhs_amount = left.getTransactionAmount();
+        const auto rhs_amount = right.getTransactionAmount();
+
         return
             // prefer more profitable transactions
             (lhs_hi > rhs_hi) || (lhs_hi == rhs_hi && lhs_lo > rhs_lo) ||
+            // prefer those with a higher aggregate transferred amount
+            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_amount > rhs_amount) ||
             // prefer those with a higher input to output ratio
             (lhs_hi == rhs_hi && lhs_lo == rhs_lo
-             && lhs_ratio > rhs_ratio)
-            ||
-            // prefer smaller
+             && lhs_amount == rhs_amount
+             && lhs_ratio > rhs_ratio) ||
+            // prefer smaller (bytes)
             (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_amount == rhs_amount
              && lhs_ratio == rhs_ratio
-             && left.getTransactionBinaryArray().size() < right.getTransactionBinaryArray().size())
-            ||
+             && left.getTransactionBinaryArray().size() < right.getTransactionBinaryArray().size()) ||
             // prefer older
             (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_amount == rhs_amount
              && lhs_ratio == rhs_ratio
              && left.getTransactionBinaryArray().size() == right.getTransactionBinaryArray().size()
              && lhs.receiveTime < rhs.receiveTime);

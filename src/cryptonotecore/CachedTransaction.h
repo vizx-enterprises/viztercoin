@@ -29,6 +29,8 @@ namespace CryptoNote
 
         uint64_t getTransactionFee() const;
 
+        uint64_t getTransactionAmount() const;
+
       private:
         Transaction transaction;
 
@@ -39,6 +41,8 @@ namespace CryptoNote
         mutable boost::optional<Crypto::Hash> transactionPrefixHash;
 
         mutable boost::optional<uint64_t> transactionFee;
+
+        mutable boost::optional<uint64_t> transactionAmount;
     };
 
 } // namespace CryptoNote

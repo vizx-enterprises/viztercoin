@@ -92,3 +92,20 @@ uint64_t CachedTransaction::getTransactionFee() const
 
     return transactionFee.get();
 }
+
+uint64_t CachedTransaction::getTransactionAmount() const
+{
+    if (!transactionAmount.is_initialized())
+    {
+        uint64_t summaryOutputAmount = 0;
+
+        for (const auto &out : transaction.outputs)
+        {
+            summaryOutputAmount += out.amount;
+        }
+
+        transactionAmount = summaryOutputAmount;
+    }
+
+    return transactionAmount.get();
+}
