@@ -25,15 +25,24 @@ namespace CryptoNote
         uint64_t lhs_hi, lhs_lo = mul128(left.getTransactionFee(), right.getTransactionBinaryArray().size(), &lhs_hi);
         uint64_t rhs_hi, rhs_lo = mul128(right.getTransactionFee(), left.getTransactionBinaryArray().size(), &rhs_hi);
 
+        const auto lhs_ratio = left.getTransaction().inputs.size() / left.getTransaction().outputs.size();
+        const auto rhs_ratio = right.getTransaction().inputs.size() / left.getTransaction().outputs.size();
+
         return
             // prefer more profitable transactions
             (lhs_hi > rhs_hi) || (lhs_hi == rhs_hi && lhs_lo > rhs_lo) ||
+            // prefer those with a higher input to output ratio
+            (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_ratio > rhs_ratio)
+            ||
             // prefer smaller
             (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_ratio == rhs_ratio
              && left.getTransactionBinaryArray().size() < right.getTransactionBinaryArray().size())
             ||
             // prefer older
             (lhs_hi == rhs_hi && lhs_lo == rhs_lo
+             && lhs_ratio == rhs_ratio
              && left.getTransactionBinaryArray().size() == right.getTransactionBinaryArray().size()
              && lhs.receiveTime < rhs.receiveTime);
     }
