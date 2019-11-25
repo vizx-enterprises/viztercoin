@@ -546,7 +546,7 @@ std::tuple<Error, uint16_t> ApiDispatcher::importAddress(const httplib::Request 
     return {SUCCESS, 201};
 }
 
-std::tuple<Error, uint16_t> ApiDispatcher::importDeterministicAddress(const Request &req, Response &res, const nlohmann::json &body)
+std::tuple<Error, uint16_t> ApiDispatcher::importDeterministicAddress(const httplib::Request &req, httplib::Response &res, const nlohmann::json &body)
 {
     uint64_t scanHeight = 0;
 
