@@ -53,11 +53,11 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y libboost-all-dev libssl-dev ${{ matrix.package_name }}
-      
+
       - name: Setup ccache
         run: |
           sudo apt install ccache
-      
+
       - name: Retrieve ccache
         uses: actions/cache@v1.0.1
         with:
@@ -92,14 +92,14 @@ jobs:
           cd src
           TARGETS="TurtleCoind miner zedwallet turtle-service cryptotest wallet-api wallet-upgrader"
           ${STRIP} ${TARGETS}
-      
+
       # Test the crypto
       - name: Test Crypto
         if: matrix.build_name != 'aarch64'
         run: |
           cd build/src
           ./cryptotest
-      
+
       # Prepare for deploy
       - name: Prepare for Deploy
         id: before_deploy
@@ -119,7 +119,7 @@ jobs:
           mkdir builds
           cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
           echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
-      
+
       # Upload to GH Release
       - name: Upload to GH Release
         if: github.event_name == 'release' && github.repository == 'turtlecoin/turtlecoin' && matrix.deployable
@@ -131,18 +131,13 @@ jobs:
           asset_path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
           asset_name: ${{ steps.before_deploy.outputs.file_name }}
           asset_content_type: application/gzip
-      
-      # Upload to S3
-      - name: Upload to S3
-        if: github.event_name != 'pull_request' && github.repository == 'turtlecoin/turtlecoin'
-        uses: opspresso/action-s3-sync@master
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-2"
-          FROM_PATH: "build/src/builds"
-          DEST_PATH: "s3://turtlecoin/turtlecoin/"
-          OPTIONS: "--acl public-read"
+
+      # Upload to GH Actions Artifacts
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: ${{ steps.before_deploy.outputs.file_name }}
+          path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
 
   # Mac builds on Catalina VM
   macos_build:
@@ -155,39 +150,39 @@ jobs:
       CCACHE_DIR: $GITHUB_WORKSPACE/.ccache
     steps:
       - uses: actions/checkout@v1
-      
+
       # Fetch Dependencies
       - name: Dependencies
         run: |
           brew install --force boost llvm@8 ccache
           brew link --force llvm@8
           ln -s /usr/local/opt/llvm@8 /usr/local/opt/llvm
-      
+
       - name: Retrieve ccache
         uses: actions/cache@v1.0.1
         with:
           path: .ccache
           key: ccache-osx
-      
+
       # Configure project with cmake
       - name: Configure
         run: |
           mkdir build && cd build
           cmake -DARCH=default -DCMAKE_BUILD_TYPE=Release -DSTATIC=true ..
-      
+
       # Build for macOS
       - name: Build
         run: |
           cd build
           make -j2
-      
+
       # Test the crypto
       - name: Test Crypto
         if: matrix.build_name != 'aarch64'
         run: |
           cd build/src
           ./cryptotest
-      
+
       # Prepare for deploy
       - name: Prepare for Deploy
         id: before_deploy
@@ -207,7 +202,7 @@ jobs:
           mkdir builds
           cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
           echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
-      
+
 
       # Upload to GH Release
       - name: Upload to GH Release
@@ -220,18 +215,13 @@ jobs:
           asset_path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
           asset_name: ${{ steps.before_deploy.outputs.file_name }}
           asset_content_type: application/gzip
-      
-      # Upload to S3
-      - name: Upload to S3
-        if: github.event_name != 'pull_request' && github.repository == 'turtlecoin/turtlecoin'
-        uses: opspresso/action-s3-sync@master
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-2"
-          FROM_PATH: "build/src/builds"
-          DEST_PATH: "s3://turtlecoin/turtlecoin/"
-          OPTIONS: "--acl public-read"
+
+      # Upload to GH Actions Artifacts
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: ${{ steps.before_deploy.outputs.file_name }}
+          path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
 
   # Windows Builds on Windows Server 2019
   windows_build:
@@ -242,7 +232,7 @@ jobs:
       LABEL: windows
     steps:
       - uses: actions/checkout@v1
-      
+
       - name: Setup clcache
         run: pip install clcache
 
@@ -273,7 +263,7 @@ jobs:
         run: |
           cd build/src/Release
           ./cryptotest.exe
-      
+
       # Prepare for deploy
       - name: Prepare for Deploy
         shell: bash
@@ -292,7 +282,7 @@ jobs:
           mkdir builds
           cp turtlecoin-${TAG}-${LABEL}.zip builds
           echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.zip
-      
+
 
       # Upload to GH Release
       - name: Upload to GH Release
@@ -305,15 +295,10 @@ jobs:
           asset_path: ./build/src/Release/${{ steps.before_deploy.outputs.file_name }}
           asset_name: ${{ steps.before_deploy.outputs.file_name }}
           asset_content_type: application/zip
-      
-      # Upload to S3
-      - name: Upload to S3
-        if: github.event_name != 'pull_request' && github.repository == 'turtlecoin/turtlecoin'
-        uses: opspresso/action-s3-sync@master
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-2"
-          FROM_PATH: "build/src/Release/builds"
-          DEST_PATH: "s3://turtlecoin/turtlecoin/"
-          OPTIONS: "--acl public-read"
+
+      # Upload to GH Actions Artifacts
+      - name: Upload To GH Artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: ${{ steps.before_deploy.outputs.file_name }}
+          path: ./build/src/Release/${{ steps.before_deploy.outputs.file_name }}
