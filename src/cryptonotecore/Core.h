@@ -208,6 +208,10 @@ namespace CryptoNote
 
         virtual uint64_t get_current_blockchain_height() const;
 
+        static WalletTypes::RawCoinbaseTransaction getRawCoinbaseTransaction(const CryptoNote::Transaction &t);
+
+        static WalletTypes::RawTransaction getRawTransaction(const std::vector<uint8_t> &rawTX);
+
       private:
         const Currency &currency;
 
@@ -390,10 +394,6 @@ namespace CryptoNote
         void cutSegment(IBlockchainCache &segment, uint32_t startIndex);
 
         void switchMainChainStorage(uint32_t splitBlockIndex, IBlockchainCache &newChain);
-
-        static WalletTypes::RawCoinbaseTransaction getRawCoinbaseTransaction(const CryptoNote::Transaction &t);
-
-        static WalletTypes::RawTransaction getRawTransaction(const std::vector<uint8_t> &rawTX);
     };
 
 } // namespace CryptoNote
