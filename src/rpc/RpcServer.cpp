@@ -327,11 +327,25 @@ void RpcServer::middleware(
     }
     catch (const std::exception &e)
     {
+        std::stringstream error;
+
+        error << "Caught unexpected exception: " << e.what() << " while processing "
+              << req.path << " request for User-Agent: " << req.get_header_value("User-Agent");
+
         Logger::logger.log(
-            "Caught unexpected exception: " + std::string(e.what()),
+            error.str(),
             Logger::FATAL,
             { Logger::DAEMON_RPC }
         );
+
+        if (req.body != "")
+        {
+            Logger::logger.log(
+                "Body: " + req.body,
+                Logger::FATAL,
+                { Logger::DAEMON_RPC }
+            );
+        }
 
         failRequest(500, "Internal server error: " + std::string(e.what()), res);
     }
