@@ -1,10 +1,10 @@
 ![image](https://user-images.githubusercontent.com/34389545/35821974-62e0e25c-0a70-11e8-87dd-2cfffeb6ed47.png)
 
 #### Master Build Status
-![Build Status](https://github.com/turtlecoin/turtlecoin/workflows/Build/badge.svg?branch=master)
+[![Build Status](https://github.com/turtlecoin/turtlecoin-utils/workflows/CI%20Build%20Tests/badge.svg?branch=master)](https://github.com/turtlecoin/turtlecoin-utils/actions)
 
 #### Development Build Status
-![Build Status](https://github.com/turtlecoin/turtlecoin/workflows/Build/badge.svg?branch=development)
+[![Build Status](https://github.com/turtlecoin/turtlecoin-utils/workflows/CI%20Build%20Tests/badge.svg?branch=development)](https://github.com/turtlecoin/turtlecoin-utils/actions)
 
 ### Installing
 
