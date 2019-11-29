@@ -59,7 +59,7 @@ jobs:
           sudo apt install ccache
 
       - name: Retrieve ccache
-        uses: actions/cache@v1.0.1
+        uses: actions/cache@v1
         with:
           path: .ccache
           key: ccache-${{ matrix.label }}
@@ -159,7 +159,7 @@ jobs:
           ln -s /usr/local/opt/llvm@8 /usr/local/opt/llvm
 
       - name: Retrieve ccache
-        uses: actions/cache@v1.0.1
+        uses: actions/cache@v1
         with:
           path: .ccache
           key: ccache-osx
@@ -237,7 +237,7 @@ jobs:
         run: pip install clcache
 
       - name: Retrieve clcache
-        uses: actions/cache@v1.0.1
+        uses: actions/cache@v1
         with:
           path: clcache
           key: clcache-windows
