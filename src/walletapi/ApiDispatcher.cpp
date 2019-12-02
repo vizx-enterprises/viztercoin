@@ -652,7 +652,7 @@ std::tuple<Error, uint16_t>
         paymentID = getJsonValue<std::string>(body, "paymentID");
     }
 
-    auto [error, hash] = m_walletBackend->sendTransactionBasic(address, amount, paymentID);
+    auto [error, hash, unused] = m_walletBackend->sendTransactionBasic(address, amount, paymentID);
 
     if (error)
     {
@@ -693,11 +693,15 @@ std::tuple<Error, uint16_t>
             Utilities::getMixinAllowableRange(m_walletBackend->getStatus().networkBlockCount);
     }
 
-    uint64_t fee = WalletConfig::defaultFee;
+    auto fee = WalletTypes::FeeType::MinimumFee();
 
     if (body.find("fee") != body.end())
     {
-        fee = getJsonValue<uint64_t>(body, "fee");
+        fee = WalletTypes::FeeType::FixedFee(getJsonValue<uint64_t>(body, "fee"));
+    }
+    else if (body.find("feePerByte") != body.end())
+    {
+        fee = WalletTypes::FeeType::FeePerByte(getJsonValue<uint64_t>(body, "feePerByte"));
     }
 
     std::vector<std::string> subWalletsToTakeFrom = {};
@@ -740,7 +744,7 @@ std::tuple<Error, uint16_t>
         }
     }
 
-    auto [error, hash] = m_walletBackend->sendTransactionAdvanced(
+    auto [error, hash, unused] = m_walletBackend->sendTransactionAdvanced(
         destinations, mixin, fee, paymentID, subWalletsToTakeFrom, changeAddress, unlockTime, extraData);
 
     if (error)

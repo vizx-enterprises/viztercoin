@@ -748,28 +748,62 @@ uint64_t WalletBackend::getTotalUnlockedBalance() const
     return unlockedBalance;
 }
 
-/* This is simply a wrapper for Transfer::sendTransactionBasic - we need to
-   pass in the daemon and subwallets instance */
-std::tuple<Error, Crypto::Hash> WalletBackend::sendTransactionBasic(
-    const std::string destination,
-    const uint64_t amount,
-    const std::string paymentID)
+std::tuple<Error, Crypto::Hash> WalletBackend::sendPreparedTransaction(
+    const WalletTypes::PreparedTransactionInfo &preparedTransaction)
 {
-    return SendTransaction::sendTransactionBasic(destination, amount, paymentID, m_daemon, m_subWallets);
+    return SendTransaction::sendPreparedTransaction(
+        preparedTransaction,
+        m_daemon,
+        m_subWallets
+    );
 }
 
-std::tuple<Error, Crypto::Hash> WalletBackend::sendTransactionAdvanced(
+/* This is simply a wrapper for Transfer::sendTransactionBasic - we need to
+   pass in the daemon and subwallets instance */
+std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBackend::sendTransactionBasic(
+    const std::string destination,
+    const uint64_t amount,
+    const std::string paymentID,
+    const bool sendAll,
+    const bool sendTransaction)
+{
+    return SendTransaction::sendTransactionBasic(
+        destination,
+        amount,
+        paymentID,
+        m_daemon,
+        m_subWallets,
+        sendAll,
+        sendTransaction
+    );
+}
+
+std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBackend::sendTransactionAdvanced(
     const std::vector<std::pair<std::string, uint64_t>> destinations,
     const uint64_t mixin,
-    const uint64_t fee,
+    const WalletTypes::FeeType fee,
     const std::string paymentID,
     const std::vector<std::string> subWalletsToTakeFrom,
     const std::string changeAddress,
     const uint64_t unlockTime,
-    const std::vector<uint8_t> extraData)
+    const std::vector<uint8_t> extraData,
+    const bool sendAll,
+    const bool sendTransaction)
 {
     return SendTransaction::sendTransactionAdvanced(
-        destinations, mixin, fee, paymentID, subWalletsToTakeFrom, changeAddress, m_daemon, m_subWallets, unlockTime, extraData);
+        destinations,
+        mixin,
+        fee,
+        paymentID,
+        subWalletsToTakeFrom,
+        changeAddress,
+        m_daemon,
+        m_subWallets,
+        unlockTime,
+        extraData,
+        sendAll,
+        sendTransaction
+    );
 }
 
 std::tuple<Error, Crypto::Hash> WalletBackend::sendFusionTransactionBasic()

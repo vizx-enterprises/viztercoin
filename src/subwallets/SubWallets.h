@@ -82,8 +82,7 @@ class SubWallets
     /* Get key images + amounts for the specified transfer amount. We
        can either take from all subwallets, or from some subset
        (usually just one address, e.g. if we're running a web wallet) */
-    std::tuple<std::vector<WalletTypes::TxInputAndOwner>, uint64_t> getTransactionInputsForAmount(
-        const uint64_t amount,
+    std::vector<WalletTypes::TxInputAndOwner> getSpendableTransactionInputs(
         const bool takeFromAll,
         std::vector<Crypto::PublicKey> subWalletsToTakeFrom,
         const uint64_t height) const;
