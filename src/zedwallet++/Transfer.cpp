@@ -214,7 +214,7 @@ void sendTransaction(
 
     Crypto::Hash hash;
 
-    std::tie(error, hash) = walletBackend->sendPreparedTransaction(preparedTransaction);
+    std::tie(error, hash) = walletBackend->sendPreparedTransaction(preparedTransaction.transactionHash);
 
     if (error)
     {

@@ -129,9 +129,11 @@ class WalletBackend
         const bool daemonSSL,
         const unsigned int syncThreadCount);
 
+    bool removePreparedTransaction(const Crypto::Hash &transactionHash);
+
     /* Sends a previously prepared transaction to the network */
     std::tuple<Error, Crypto::Hash> sendPreparedTransaction(
-        const WalletTypes::PreparedTransactionInfo &preparedTransaction);
+        const Crypto::Hash transactionHash);
 
     /* Send a transaction of amount to destination with paymentID */
     std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> sendTransactionBasic(
@@ -335,4 +337,7 @@ class WalletBackend
     std::shared_ptr<WalletSynchronizerRAIIWrapper> m_syncRAIIWrapper;
 
     unsigned int m_syncThreadCount;
+
+    /* Prepared, unsent transactions. */
+    std::unordered_map<Crypto::Hash, WalletTypes::PreparedTransactionInfo> m_preparedTransactions;
 };

@@ -301,6 +301,21 @@ std::string Error::getErrorMessage() const
                    "If the problem persists, please reduce the number of "
                    "destinations that you are trying to send to.";
         }
+        case PREPARED_TRANSACTION_EXPIRED:
+        {
+            return "The prepared transaction contains inputs that have since "
+                   "been spent or are no longer available, probably due to sending "
+                   "another transaction in between preparing this transaction and "
+                   "sending it. The prepared transaction has been cancelled.";
+        }
+        case PREPARED_TRANSACTION_NOT_FOUND:
+        {
+            return "The prepared transaction hash given does not exist, either "
+                   "because it never existed or because the wallet process was "
+                   "restarted and the previously prepared transactions were lost. "
+                   "Please re-prepare and re-send the transaction, ensuring you "
+                   "specify the correct transaction hash.";
+        }
         /* No default case so the compiler warns us if we missed one */
     }
 

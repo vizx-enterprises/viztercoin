@@ -445,6 +445,22 @@ std::tuple<bool, Crypto::PublicKey> SubWallets::getKeyImageOwner(const Crypto::K
     return {false, Crypto::PublicKey()};
 }
 
+/* Determine if the input given is available for spending */
+bool SubWallets::haveSpendableInput(
+    const WalletTypes::TransactionInput& input,
+    const uint64_t height) const
+{
+    for (const auto &[pubKey, subWallet] : m_subWallets)
+    {
+        if (subWallet.haveSpendableInput(input, height))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /* Remember if the transaction suceeds, we need to remove these key images
    so we don't double spend.
 

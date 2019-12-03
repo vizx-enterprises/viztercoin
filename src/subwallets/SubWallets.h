@@ -79,6 +79,12 @@ class SubWallets
 
     void storeTransactionInput(const Crypto::PublicKey publicSpendKey, const WalletTypes::TransactionInput input);
 
+    /* Determine if the input is in the spendable container and is unlocked
+     * at this height. */
+    bool haveSpendableInput(
+        const WalletTypes::TransactionInput& input,
+        const uint64_t height) const;
+
     /* Get key images + amounts for the specified transfer amount. We
        can either take from all subwallets, or from some subset
        (usually just one address, e.g. if we're running a web wallet) */

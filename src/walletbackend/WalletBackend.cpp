@@ -748,14 +748,58 @@ uint64_t WalletBackend::getTotalUnlockedBalance() const
     return unlockedBalance;
 }
 
-std::tuple<Error, Crypto::Hash> WalletBackend::sendPreparedTransaction(
-    const WalletTypes::PreparedTransactionInfo &preparedTransaction)
+bool WalletBackend::removePreparedTransaction(const Crypto::Hash &transactionHash)
 {
-    return SendTransaction::sendPreparedTransaction(
+    const bool removed = m_preparedTransactions.erase(transactionHash) == 1;
+
+    std::stringstream stream;
+
+    if (removed)
+    {
+        stream << "Removed prepared transaction " << transactionHash
+               << " as it is no longer valid or has just been sent.";
+    }
+    else
+    {
+        stream << "Could not remove prepared transaction: " << transactionHash
+               << " as it does not exist in the prepared transaction container.";
+    }
+
+    Logger::logger.log(
+        stream.str(),
+        Logger::INFO,
+        { Logger::TRANSACTIONS }
+    );
+
+    return removed;
+}
+
+std::tuple<Error, Crypto::Hash> WalletBackend::sendPreparedTransaction(
+    const Crypto::Hash transactionHash)
+{
+    auto it = m_preparedTransactions.find(transactionHash);
+
+    if (it == m_preparedTransactions.end())
+    {
+        return {PREPARED_TRANSACTION_NOT_FOUND, Crypto::Hash()};
+    }
+
+    const auto preparedTransaction = it->second;
+
+    const auto [error, hash] = SendTransaction::sendPreparedTransaction(
         preparedTransaction,
         m_daemon,
         m_subWallets
     );
+
+    /* Remove the prepared transaction if we just sent it or it's no longer
+     * valid */
+    if (error == PREPARED_TRANSACTION_EXPIRED || !error)
+    {
+        removePreparedTransaction(preparedTransaction.transactionHash);
+    }
+
+    return {error, hash};
 }
 
 /* This is simply a wrapper for Transfer::sendTransactionBasic - we need to
@@ -767,7 +811,7 @@ std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBack
     const bool sendAll,
     const bool sendTransaction)
 {
-    return SendTransaction::sendTransactionBasic(
+    const auto [error, hash, preparedTransaction] = SendTransaction::sendTransactionBasic(
         destination,
         amount,
         paymentID,
@@ -776,6 +820,13 @@ std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBack
         sendAll,
         sendTransaction
     );
+
+    if (!sendTransaction && !error)
+    {
+        m_preparedTransactions[hash] = preparedTransaction;
+    }
+
+    return {error, hash, preparedTransaction};
 }
 
 std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBackend::sendTransactionAdvanced(
@@ -790,7 +841,7 @@ std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBack
     const bool sendAll,
     const bool sendTransaction)
 {
-    return SendTransaction::sendTransactionAdvanced(
+    const auto [error, hash, preparedTransaction] = SendTransaction::sendTransactionAdvanced(
         destinations,
         mixin,
         fee,
@@ -804,6 +855,13 @@ std::tuple<Error, Crypto::Hash, WalletTypes::PreparedTransactionInfo> WalletBack
         sendAll,
         sendTransaction
     );
+
+    if (!sendTransaction && !error)
+    {
+        m_preparedTransactions[hash] = preparedTransaction;
+    }
+
+    return {error, hash, preparedTransaction};
 }
 
 std::tuple<Error, Crypto::Hash> WalletBackend::sendFusionTransactionBasic()

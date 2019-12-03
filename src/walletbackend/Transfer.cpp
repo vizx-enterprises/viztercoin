@@ -497,6 +497,8 @@ namespace SendTransaction
                 return {sendError, Crypto::Hash(), WalletTypes::PreparedTransactionInfo()};
             }
 
+            txInfo.transactionHash = txHash;
+
             /* Store the unconfirmed transaction, update our balance */
             storeSentTransaction(txHash, actualFee, paymentID, ourInputs, changeAddress, changeRequired, subWallets);
 
@@ -515,7 +517,8 @@ namespace SendTransaction
         }
         else
         {
-            return {SUCCESS, Crypto::Hash(), txInfo};
+            txInfo.transactionHash = getTransactionHash(txResult.transaction);
+            return {SUCCESS, txInfo.transactionHash, txInfo};
         }
     }
 
@@ -524,6 +527,14 @@ namespace SendTransaction
         const std::shared_ptr<Nigel> daemon,
         const std::shared_ptr<SubWallets> subWallets)
     {
+        for (const auto &input : txInfo.inputs)
+        {
+            if (!subWallets->haveSpendableInput(input.input, daemon->networkBlockCount()))
+            {
+                return {PREPARED_TRANSACTION_EXPIRED, Crypto::Hash()};
+            }
+        }
+
         const auto [sendError, txHash] = relayTransaction(txInfo.tx.transaction, daemon);
 
         if (sendError)

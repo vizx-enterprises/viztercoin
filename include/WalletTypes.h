@@ -547,6 +547,7 @@ namespace WalletTypes
         std::string changeAddress;
         uint64_t changeRequired;
         TransactionResult tx;
+        Crypto::Hash transactionHash;
     };
 
     inline void to_json(nlohmann::json &j, const TopBlock &t)
