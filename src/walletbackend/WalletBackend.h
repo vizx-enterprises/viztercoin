@@ -129,6 +129,7 @@ class WalletBackend
         const bool daemonSSL,
         const unsigned int syncThreadCount);
 
+    /* Remove a previously prepared transaction. */
     bool removePreparedTransaction(const Crypto::Hash &transactionHash);
 
     /* Sends a previously prepared transaction to the network */
