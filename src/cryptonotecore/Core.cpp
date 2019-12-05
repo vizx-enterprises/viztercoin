@@ -1145,7 +1145,7 @@ namespace CryptoNote
         {
             uint64_t fee = 0;
             auto transactionValidationResult =
-                validateTransaction(transaction, validatorState, cache, fee, previousBlockIndex, false);
+                validateTransaction(transaction, validatorState, cache, m_transactionValidationThreadPool, fee, previousBlockIndex, false);
             if (transactionValidationResult)
             {
                 logger(Logging::DEBUGGING) << "Failed to validate transaction " << transaction.getTransactionHash()
@@ -1706,7 +1706,7 @@ namespace CryptoNote
         uint64_t fee;
 
         if (auto validationResult =
-                validateTransaction(cachedTransaction, validatorState, chainsLeaves[0], fee, getTopBlockIndex(), true))
+                validateTransaction(cachedTransaction, validatorState, chainsLeaves[0], m_transactionValidationThreadPool, fee, getTopBlockIndex(), true))
         {
             logger(Logging::DEBUGGING) << "Transaction " << transactionHash
                                        << " is not valid. Reason: " << validationResult.message();
@@ -1784,7 +1784,7 @@ namespace CryptoNote
         const AccountPublicAddress &adr,
         const BinaryArray &extraNonce,
         uint64_t &difficulty,
-        uint32_t &height) const
+        uint32_t &height)
     {
         throwIfNotInitialized();
 
@@ -2072,6 +2072,7 @@ namespace CryptoNote
         const CachedTransaction &cachedTransaction,
         TransactionValidatorState &state,
         IBlockchainCache *cache,
+        Utilities::ThreadPool<bool> &threadPool,
         uint64_t &fee,
         uint32_t blockIndex,
         const bool isPoolTransaction)
@@ -2082,6 +2083,7 @@ namespace CryptoNote
             cache,
             currency,
             checkpoints,
+            threadPool,
             blockIndex,
             blockMedianSize,
             isPoolTransaction
@@ -2716,7 +2718,6 @@ namespace CryptoNote
     /* A transaction that is valid at the time it was added to the pool, is not
        neccessarily valid now, if the network rules changed. */
     bool Core::validateBlockTemplateTransaction(const CachedTransaction &cachedTransaction, const uint64_t blockHeight)
-        const
     {
         /* Not used in revalidateAfterHeightChange() */
         TransactionValidatorState state;
@@ -2727,6 +2728,7 @@ namespace CryptoNote
             nullptr, /* Not used in revalidateAfterHeightChange() */
             currency,
             checkpoints,
+            m_transactionValidationThreadPool,
             blockHeight,
             blockMedianSize,
             true /* Pool transaction */
@@ -2743,7 +2745,7 @@ namespace CryptoNote
         const size_t maxCumulativeSize,
         const uint64_t height,
         size_t &transactionsSize,
-        uint64_t &fee) const
+        uint64_t &fee)
     {
         transactionsSize = 0;
         fee = 0;
