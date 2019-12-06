@@ -514,13 +514,5 @@ bool ValidateTransaction::validateTransactionInputsExpensive()
 
     /* Wait for every validation thread to finish processing. Valid if every
      * one returns true. */
-    if (std::all_of(validationResult.begin(), validationResult.end(), [](auto &result) { return result.get(); }))
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return std::all_of(validationResult.begin(), validationResult.end(), [](auto &result) { return result.get(); });
 }
-
