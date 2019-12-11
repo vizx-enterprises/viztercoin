@@ -3389,8 +3389,13 @@ namespace CryptoNote
         }
     }
 
-    BlockDetails Core::getBlockDetails(const uint32_t blockHeight) const
+    BlockDetails Core::getBlockDetails(const uint32_t blockHeight, const uint32_t attempt) const
     {
+        if (attempt > 10)
+        {
+            throw std::runtime_error("Requested block height wasn't found in blockchain.");
+        }
+
         throwIfNotInitialized();
 
         IBlockchainCache *segment = findSegmentContainingBlock(blockHeight);
@@ -3399,7 +3404,17 @@ namespace CryptoNote
             throw std::runtime_error("Requested block height wasn't found in blockchain.");
         }
 
-        return getBlockDetails(segment->getBlockHash(blockHeight));
+        try
+        {
+            return getBlockDetails(segment->getBlockHash(blockHeight));
+        }
+        catch (const std::out_of_range &e)
+        {
+            logger(Logging::INFO) << "Failed to get block details, mid chain reorg";
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            return getBlockDetails(blockHeight, attempt+1);
+        }
     }
 
     BlockDetails Core::getBlockDetails(const Crypto::Hash &blockHash) const

@@ -207,7 +207,7 @@ namespace CryptoNote
 
         virtual BlockDetails getBlockDetails(const Crypto::Hash &blockHash) const override;
 
-        BlockDetails getBlockDetails(const uint32_t blockHeight) const;
+        BlockDetails getBlockDetails(const uint32_t blockHeight, const uint32_t attempt = 0) const;
 
         virtual TransactionDetails getTransactionDetails(const Crypto::Hash &transactionHash) const override;
 
