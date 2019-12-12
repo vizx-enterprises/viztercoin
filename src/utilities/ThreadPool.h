@@ -25,7 +25,8 @@ namespace Utilities
             {
             }
 
-            ThreadPool(uint64_t threadCount)
+            ThreadPool(uint64_t threadCount) :
+                m_shouldStop(false)
             {
                 if (threadCount == 0)
                 {
