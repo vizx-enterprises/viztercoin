@@ -41,7 +41,8 @@ namespace CryptoNote
             Checkpoints &&checkpoints,
             System::Dispatcher &dispatcher,
             std::unique_ptr<IBlockchainCacheFactory> &&blockchainCacheFactory,
-            std::unique_ptr<IMainChainStorage> &&mainChainStorage);
+            std::unique_ptr<IMainChainStorage> &&mainChainStorage,
+            uint32_t transactionValidationThreads);
 
         virtual ~Core();
 

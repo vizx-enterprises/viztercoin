@@ -235,7 +235,8 @@ namespace CryptoNote
         Checkpoints &&checkpoints,
         System::Dispatcher &dispatcher,
         std::unique_ptr<IBlockchainCacheFactory> &&blockchainCacheFactory,
-        std::unique_ptr<IMainChainStorage> &&mainchainStorage):
+        std::unique_ptr<IMainChainStorage> &&mainchainStorage,
+        const uint32_t transactionValidationThreads):
         currency(currency),
         dispatcher(dispatcher),
         contextGroup(dispatcher),
@@ -244,7 +245,8 @@ namespace CryptoNote
         upgradeManager(new UpgradeManager()),
         blockchainCacheFactory(std::move(blockchainCacheFactory)),
         mainChainStorage(std::move(mainchainStorage)),
-        initialized(false)
+        initialized(false),
+        m_transactionValidationThreadPool(transactionValidationThreads)
     {
         upgradeManager->addMajorBlockVersion(BLOCK_MAJOR_VERSION_2, currency.upgradeHeight(BLOCK_MAJOR_VERSION_2));
         upgradeManager->addMajorBlockVersion(BLOCK_MAJOR_VERSION_3, currency.upgradeHeight(BLOCK_MAJOR_VERSION_3));
