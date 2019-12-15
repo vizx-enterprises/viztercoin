@@ -512,7 +512,15 @@ bool ValidateTransaction::validateTransactionInputsExpensive()
         inputIndex++;
     }
 
-    /* Wait for every validation thread to finish processing. Valid if every
-     * one returns true. */
-    return std::all_of(validationResult.begin(), validationResult.end(), [](auto &result) { return result.get(); });
+    bool valid = true;
+
+    for (const auto result : validationResult)
+    {
+        if (!result.get())
+        {
+            valid = false;
+        }
+    }
+
+    return valid;
 }
