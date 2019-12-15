@@ -56,6 +56,7 @@ typedef int socket_t;
 #define INVALID_SOCKET (-1)
 #endif //_WIN32
 
+#include <atomic>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -268,6 +269,7 @@ protected:
     bool process_request(Stream& strm, bool last_connection, bool& connection_close);
 
     size_t keep_alive_max_count_;
+    std::atomic<bool> m_shouldStop = false;
 
 private:
     typedef std::vector<std::pair<std::regex, Handler>> Handlers;
@@ -617,6 +619,7 @@ inline bool read_socket(
     size_t keep_alive_max_count,
     T callback,
     bool close,
+    std::atomic<bool> &shouldStop,
     bool keepAliveForever = false)
 {
     bool ret = false;
@@ -625,7 +628,8 @@ inline bool read_socket(
     {
         while (detail::select_read(sock,
                                    CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND,
-                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0)
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0
+            && !shouldStop)
         {
             SocketStream strm(sock);
 
@@ -1845,6 +1849,7 @@ inline void Server::stop()
 {
     if (is_running_) {
         assert(svr_sock_ != INVALID_SOCKET);
+        m_shouldStop = true;
         auto sock = svr_sock_;
         svr_sock_ = INVALID_SOCKET;
         detail::shutdown_socket(sock);
@@ -2361,6 +2366,7 @@ inline bool Server::read_socket(socket_t sock)
             return process_request(strm, last_connection, connection_close);
         },
         close,
+        m_shouldStop,
         true);
 }
 
@@ -2562,13 +2568,17 @@ inline bool Client::read_socket(socket_t sock, Request& req, Response& res)
 {
     bool close = false;
 
+    std::atomic<bool> shouldStop = false;
+
     return detail::read_socket(
         sock,
         0,
         [&](Stream& strm, bool /*last_connection*/, bool& connection_close) {
             return process_request(strm, req, res, connection_close);
         },
-        close);
+        close,
+        shouldStop,
+        false);
 }
 
 inline bool Client::is_ssl() const
@@ -2724,6 +2734,7 @@ inline bool read_socket_ssl(
     U SSL_connect_or_accept, V setup,
     T callback,
     bool close,
+    std::atomic<bool> &shouldStop,
     bool keepAliveForever = false)
 {
     SSL* ssl = nullptr;
@@ -2749,7 +2760,8 @@ inline bool read_socket_ssl(
     {
         while (detail::select_read(sock,
                                    CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND,
-                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0)
+                                   CPPHTTPLIB_KEEPALIVE_TIMEOUT_USECOND) > 0
+            && !shouldStop)
         {
             SSLSocketStream strm(sock, ssl);
 
@@ -2891,6 +2903,7 @@ inline bool SSLServer::read_socket(socket_t sock)
             return process_request(strm, last_connection, connection_close);
         },
         close,
+        m_shouldStop,
         true);
 }
 
@@ -2922,6 +2935,8 @@ inline bool SSLClient::read_socket(socket_t sock, Request& req, Response& res)
 {
     bool close = false;
 
+    std::atomic<bool> shouldStop = false;
+
     return is_valid() && detail::read_socket_ssl(
         sock, 0,
         ctx_, ctx_mutex_,
@@ -2932,7 +2947,9 @@ inline bool SSLClient::read_socket(socket_t sock, Request& req, Response& res)
         [&](Stream& strm, bool /*last_connection*/, bool& connection_close) {
             return process_request(strm, req, res, connection_close);
         },
-        close);
+        close,
+        shouldStop,
+        false);
 }
 #endif
 
