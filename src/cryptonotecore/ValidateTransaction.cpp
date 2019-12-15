@@ -514,7 +514,7 @@ bool ValidateTransaction::validateTransactionInputsExpensive()
 
     bool valid = true;
 
-    for (const auto result : validationResult)
+    for (auto &result : validationResult)
     {
         if (!result.get())
         {
