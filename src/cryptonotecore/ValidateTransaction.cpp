@@ -328,7 +328,7 @@ bool ValidateTransaction::validateTransactionFee()
     {
         bool validFee = fee != 0;
 
-        if (m_blockHeight >= CryptoNote::parameters::MINIMUM_FEE_PER_256_BYTES_V1_HEIGHT)
+        if (m_blockHeight >= CryptoNote::parameters::MINIMUM_FEE_PER_BYTE_V1_HEIGHT)
         {
             const auto minFee = Utilities::getMinimumTransactionFee(
                 m_cachedTransaction.getTransactionBinaryArray().size(),
