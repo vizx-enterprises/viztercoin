@@ -1767,7 +1767,7 @@ namespace CryptoNote
 
             if (!fee.isFixedFee)
             {
-                const uint64_t feePerByte = fee.isFeePerByte
+                const double feePerByte = fee.isFeePerByte
                     ? fee.feePerByte
                     : CryptoNote::parameters::MINIMUM_FEE_PER_BYTE_V1;
 
