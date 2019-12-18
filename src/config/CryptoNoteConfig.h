@@ -209,9 +209,9 @@ namespace CryptoNote
            to help curtail fusion transaction spam. */
         const size_t FUSION_TX_MAX_POOL_COUNT = 20;
 
-        const size_t NORMAL_TX_MAX_OUTPUT_RATIO_V1 = 10;
+        const size_t NORMAL_TX_MAX_OUTPUT_COUNT_V1 = 90;
 
-        const size_t NORMAL_TX_MAX_OUTPUT_RATIO_V1_HEIGHT = 2200000;
+        const size_t NORMAL_TX_MAX_OUTPUT_COUNT_V1_HEIGHT = 2200000;
 
         const uint32_t UPGRADE_HEIGHT_V2 = 1;
 
