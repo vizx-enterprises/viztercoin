@@ -1088,10 +1088,9 @@ namespace SendTransaction
            working, maybe we can work some magic. TODO */
         setupTX.outputs = keyOutputToTransactionOutput(result.outputs);
 
-        if (setupTX.outputs.size() > setupTX.inputs.size() * CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_RATIO_V1)
+        if (setupTX.outputs.size() > CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_COUNT_V1)
         {
             result.error = OUTPUT_DECOMPOSITION;
-
             return result;
         }
 

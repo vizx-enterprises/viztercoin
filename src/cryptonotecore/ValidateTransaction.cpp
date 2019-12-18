@@ -362,13 +362,12 @@ bool ValidateTransaction::validateTransactionExtra()
 
 bool ValidateTransaction::validateInputOutputRatio()
 {
-    if (m_isPoolTransaction || m_blockHeight >= CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_RATIO_V1_HEIGHT)
+    if (m_isPoolTransaction || m_blockHeight >= CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_COUNT_V1_HEIGHT)
     {
-        if (m_transaction.outputs.size()
-            > m_transaction.inputs.size() * CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_RATIO_V1)
+        if (m_transaction.outputs.size() > CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_COUNT_V1)
         {
             m_validationResult.errorCode = CryptoNote::error::TransactionValidationError::EXCESSIVE_OUTPUTS;
-            m_validationResult.errorMessage = "Transaction has excessive output/input ratio";
+            m_validationResult.errorMessage = "Transaction has excessive outputs. Reduce the number of payees.";
 
             return false;
         }

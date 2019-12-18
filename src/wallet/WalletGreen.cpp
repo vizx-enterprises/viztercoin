@@ -2825,10 +2825,9 @@ namespace CryptoNote
                 make_error_code(error::INTERNAL_WALLET_ERROR), "Failed to deserialize created transaction");
         }
 
-        if (cryptoNoteTransaction.outputs.size() > cryptoNoteTransaction.inputs.size() * CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_RATIO_V1)
+        if (cryptoNoteTransaction.outputs.size() > CryptoNote::parameters::NORMAL_TX_MAX_OUTPUT_COUNT_V1)
         {
-            m_logger(ERROR, BRIGHT_RED) << "Transaction has an excessive number of outputs "
-                                        << " for the input count";
+            m_logger(ERROR, BRIGHT_RED) << "Transaction has an excessive number of outputs";
 
             throw std::system_error(make_error_code(error::EXCESSIVE_OUTPUTS));
         }
