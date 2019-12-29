@@ -242,6 +242,9 @@ jobs:
           path: clcache
           key: clcache-windows
 
+      - name: Install OpenSSL
+        run: choco install openssl
+
       # Configure project with cmake
       - name: Configure
         run: |
