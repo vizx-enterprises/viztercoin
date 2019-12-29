@@ -114,11 +114,11 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp ${TARGETS} turtlecoin-${TAG}/
           cp ../../LICENSE turtlecoin-${TAG}/
-          tar cvfz turtlecoin-${TAG}-${LABEL}.tar.gz turtlecoin-${TAG}/
+          tar cvfz turtlecoin-${LABEL}-${TAG}.tar.gz turtlecoin-${TAG}/
           rm -rf builds
           mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
+          cp turtlecoin-${LABEL}-${TAG}.tar.gz builds
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.tar.gz
 
       # Upload to GH Release
       - name: Upload to GH Release
@@ -197,11 +197,11 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp ${TARGETS} turtlecoin-${TAG}/
           cp ../../LICENSE turtlecoin-${TAG}/
-          tar cvfz turtlecoin-${TAG}-${LABEL}.tar.gz turtlecoin-${TAG}/
+          tar cvfz turtlecoin-${LABEL}-${TAG}.tar.gz turtlecoin-${TAG}/
           rm -rf builds
           mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
+          cp turtlecoin-${LABEL}-${TAG}.tar.gz builds
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.tar.gz
 
 
       # Upload to GH Release
@@ -280,11 +280,11 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp *.exe turtlecoin-${TAG}/
           cp ../../../LICENSE turtlecoin-${TAG}/
-          7z a turtlecoin-${TAG}-${LABEL}.zip turtlecoin-${TAG}/
+          7z a turtlecoin-${LABEL}-${TAG}.zip turtlecoin-${TAG}/
           rm -rf builds
           mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.zip builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.zip
+          cp turtlecoin-${LABEL}-${TAG}.zip builds
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.zip
 
 
       # Upload to GH Release
