@@ -114,15 +114,14 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp ${TARGETS} turtlecoin-${TAG}/
           cp ../../LICENSE turtlecoin-${TAG}/
-          tar cvfz turtlecoin-${TAG}-${LABEL}.tar.gz turtlecoin-${TAG}/
-          rm -rf builds
-          mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
+          tar cvfz turtlecoin-${LABEL}-${TAG}.tar.gz turtlecoin-${TAG}/
+          echo ::set-output name=binary_path::turtlecoin-${TAG}
+          echo ::set-output name=artifact_name::turtlecoin-${LABEL}-${TAG}
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.tar.gz
 
       # Upload to GH Release
       - name: Upload to GH Release
-        if: github.event_name == 'release' && github.repository == 'turtlecoin/turtlecoin' && matrix.deployable
+        if: github.event_name == 'release' && matrix.deployable
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -136,8 +135,8 @@ jobs:
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: ${{ steps.before_deploy.outputs.file_name }}
-          path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
+          name: ${{ steps.before_deploy.outputs.artifact_name }}
+          path: ./build/src/${{ steps.before_deploy.outputs.binary_path }}
 
   # Mac builds on Catalina VM
   macos_build:
@@ -197,16 +196,15 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp ${TARGETS} turtlecoin-${TAG}/
           cp ../../LICENSE turtlecoin-${TAG}/
-          tar cvfz turtlecoin-${TAG}-${LABEL}.tar.gz turtlecoin-${TAG}/
-          rm -rf builds
-          mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.tar.gz builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.tar.gz
+          tar cvfz turtlecoin-${LABEL}-${TAG}.tar.gz turtlecoin-${TAG}/
+          echo ::set-output name=binary_path::turtlecoin-${TAG}
+          echo ::set-output name=artifact_name::turtlecoin-${LABEL}-${TAG}
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.tar.gz
 
 
       # Upload to GH Release
       - name: Upload to GH Release
-        if: github.event_name == 'release' && github.repository == 'turtlecoin/turtlecoin'
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -220,8 +218,8 @@ jobs:
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: ${{ steps.before_deploy.outputs.file_name }}
-          path: ./build/src/${{ steps.before_deploy.outputs.file_name }}
+          name: ${{ steps.before_deploy.outputs.artifact_name }}
+          path: ./build/src/${{ steps.before_deploy.outputs.binary_path }}
 
   # Windows Builds on Windows Server 2019
   windows_build:
@@ -280,16 +278,15 @@ jobs:
           mkdir turtlecoin-${TAG}
           cp *.exe turtlecoin-${TAG}/
           cp ../../../LICENSE turtlecoin-${TAG}/
-          7z a turtlecoin-${TAG}-${LABEL}.zip turtlecoin-${TAG}/
-          rm -rf builds
-          mkdir builds
-          cp turtlecoin-${TAG}-${LABEL}.zip builds
-          echo ::set-output name=file_name::turtlecoin-${TAG}-${LABEL}.zip
+          7z a turtlecoin-${LABEL}-${TAG}.zip turtlecoin-${TAG}/
+          echo ::set-output name=binary_path::turtlecoin-${TAG}
+          echo ::set-output name=artifact_name::turtlecoin-${LABEL}-${TAG}
+          echo ::set-output name=file_name::turtlecoin-${LABEL}-${TAG}.zip
 
 
       # Upload to GH Release
       - name: Upload to GH Release
-        if: github.event_name == 'release' && github.repository == 'turtlecoin/turtlecoin'
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -303,5 +300,5 @@ jobs:
       - name: Upload To GH Artifacts
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: ${{ steps.before_deploy.outputs.file_name }}
-          path: ./build/src/Release/${{ steps.before_deploy.outputs.file_name }}
+          name: ${{ steps.before_deploy.outputs.artifact_name }}
+          path: ./build/src/Release/${{ steps.before_deploy.outputs.binary_path }}
