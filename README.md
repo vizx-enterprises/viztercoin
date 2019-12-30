@@ -140,7 +140,7 @@ You can build for 32-bit or 64-bit Windows. **If you're not sure, pick 64-bit.**
 
 - Download the [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=16) Installer
 - When it opens up select **C++ build tools**, it automatically selects the needed parts
-- Install Boost (1.69 works the latest is 1.70 and doesn't work). Select the appropriate version for your system:
+- Install Boost. Select the appropriate version for your system:
   - [Boost 64-bit](https://bintray.com/boostorg/release/download_file?file_path=1.69.0%2Fbinaries%2Fboost_1_69_0-msvc-14.1-64.exe)
   - [Boost 32-bit](https://bintray.com/boostorg/release/download_file?file_path=1.69.0%2Fbinaries%2Fboost_1_69_0-msvc-14.1-32.exe)
 - Install the latest full LTS version of OpenSSL (currently OpenSSL 1.1.0L). Select the appropriate version for your system:
