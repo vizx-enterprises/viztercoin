@@ -57,7 +57,7 @@ namespace Crypto
         {
             if (!Common::podFromHex(s, data))
             {
-                throw std::invalid_argument("Error parsing JSON KeyDerivation, wrong length or not hex");
+                throw std::invalid_argument("Error parsing JSON EllipticCurvePoint, wrong length or not hex");
             }
         }
 
@@ -104,7 +104,7 @@ namespace Crypto
         {
             if (!Common::podFromHex(s, data))
             {
-                throw std::invalid_argument("Error parsing JSON KeyDerivation, wrong length or not hex");
+                throw std::invalid_argument("Error parsing JSON EllipticCurveScalar, wrong length or not hex");
             }
         }
 
