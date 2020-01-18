@@ -31,6 +31,11 @@ namespace Crypto
             std::copy(input, input + 32, std::begin(data));
         }
 
+        EllipticCurvePoint(const std::string &s)
+        {
+            fromString(s);
+        }
+
         bool operator==(const EllipticCurvePoint &other) const
         {
             return std::equal(std::begin(data), std::end(data), std::begin(other.data));
@@ -71,6 +76,11 @@ namespace Crypto
         EllipticCurveScalar(const uint8_t input[32])
         {
             std::copy(input, input + 32, std::begin(data));
+        }
+
+        EllipticCurveScalar(const std::string &s)
+        {
+            fromString(s);
         }
 
         bool operator==(const EllipticCurveScalar &other) const
@@ -147,6 +157,11 @@ namespace Crypto
             std::copy(input, input + 32, std::begin(data));
         }
 
+        PublicKey(const std::string &s)
+        {
+            fromString(s);
+        }
+
         bool operator==(const PublicKey &other) const
         {
             return std::equal(std::begin(data), std::end(data), std::begin(other.data));
@@ -187,6 +202,11 @@ namespace Crypto
         SecretKey(const uint8_t input[32])
         {
             std::copy(input, input + 32, std::begin(data));
+        }
+
+        SecretKey(const std::string &s)
+        {
+            fromString(s);
         }
 
         bool operator==(const SecretKey &other) const
@@ -231,6 +251,11 @@ namespace Crypto
             std::copy(input, input + 32, std::begin(data));
         }
 
+        KeyDerivation(const std::string &s)
+        {
+            fromString(s);
+        }
+
         bool operator==(const KeyDerivation &other) const
         {
             return std::equal(std::begin(data), std::end(data), std::begin(other.data));
@@ -271,6 +296,11 @@ namespace Crypto
         KeyImage(const uint8_t input[32])
         {
             std::copy(input, input + 32, std::begin(data));
+        }
+
+        KeyImage(const std::string &s)
+        {
+            fromString(s);
         }
 
         bool operator==(const KeyImage &other) const
@@ -315,6 +345,11 @@ namespace Crypto
             std::copy(input, input + 64, std::begin(data));
         }
 
+        Signature(const std::string &s)
+        {
+            fromString(s);
+        }
+
         bool operator==(const Signature &other) const
         {
             return std::equal(std::begin(data), std::end(data), std::begin(other.data));
@@ -323,6 +358,21 @@ namespace Crypto
         bool operator!=(const Signature &other) const
         {
             return !(*this == other);
+        }
+
+        /* Converts the class to a json object */
+        void toJSON(rapidjson::Writer<rapidjson::StringBuffer> &writer) const
+        {
+            writer.String(Common::podToHex(data));
+        }
+
+        /* Initializes the class from a json string */
+        void fromString(const std::string &s)
+        {
+            if (!Common::podFromHex(s, data))
+            {
+                throw std::invalid_argument("Error parsing JSON keyimage, wrong length or not hex");
+            }
         }
 
         uint8_t data[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
