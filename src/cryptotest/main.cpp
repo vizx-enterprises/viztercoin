@@ -368,6 +368,39 @@ int main(int argc, char **argv)
         std::cout << std::endl << "Test Crypto Primitives" << std::endl << std::endl;
 
         {
+            std::cout << "Crypto::crypto_ops::prepareRingSignatures: ";
+
+            Crypto::Hash txPrefixHash;
+
+            Common::podFromHex("b542df5b6e7f5f05275c98e7345884e2ac726aeeb07e03e44e0389eb86cd05f0", txPrefixHash);
+
+            Crypto::KeyImage keyImage("6865866ed8a25824e042e21dd36e946836b58b03366e489aecf979f444f599b0");
+
+            std::vector<Crypto::PublicKey> publicKeys;
+
+            publicKeys.push_back(Crypto::PublicKey("492390897da1cabd3886e3eff43ad1d04aa510a905bec0acd31a0a2f260e7862"));
+
+            publicKeys.push_back(Crypto::PublicKey("7644ccb5410cca2be18b033e5f7497aeeeafd1d8f317f29cba4803e4306aa402"));
+
+            publicKeys.push_back(Crypto::PublicKey("bb9a956ffdf8159ad69474e6b0811316c44a17a540d5e39a44642d4d933a6460"));
+
+            publicKeys.push_back(Crypto::PublicKey("e1cd9ccdfdf2b3a45ac2cfd1e29185d22c185742849f52368c3cdd1c0ce499c0"));
+
+            Crypto::SecretKey privateEmpheremal("73a8e577d58f7c11992201d4014ac7eef39c1e9f6f6d78673103de60a0c3240b");
+
+            const auto [success, signatures, k] = Crypto::crypto_ops::prepareRingSignatures(txPrefixHash, keyImage, publicKeys, 3);
+
+            if (!success)
+            {
+                std::cout << "failed" << std::endl;
+
+                exit(1);
+            }
+
+            std::cout << "passed" << std::endl;
+        }
+
+        {
             std::cout << "Crypto::crypto_ops::generateRingSignatures: ";
 
             Crypto::Hash txPrefixHash;
@@ -434,7 +467,7 @@ int main(int argc, char **argv)
                 65,
                 "0c6b5fff72260832558e35c38e690072503211af065056862288dc7fd992350a");
 
-            std::cout << "Passed." << std::endl;
+            std::cout << "passed" << std::endl;
         }
 
         std::cout << std::endl << "Test Multisig Primitives" << std::endl << std::endl;
