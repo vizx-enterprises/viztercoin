@@ -13,7 +13,7 @@ namespace WalletConfig
     const std::string_view addressPrefix = "v";
 
     /* Your coins 'Ticker', e.g. Monero = XMR, Bitcoin = BTC */
-    const std::string ticker = "VIZX";
+    const std::string ticker = "VZX";
 
     /* The filename to output the CSV to in save_csv */
     const std::string csvFilename = "transactions.csv";
