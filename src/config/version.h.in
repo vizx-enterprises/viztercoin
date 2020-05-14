@@ -5,9 +5,9 @@
 #define PROJECT_SITE "http://vizter.xyz"
 #define PROJECT_COPYRIGHT "Copyright 2018-2020, The TurtleCoin Developers \n Copyright 2020, Vizx Enterprises"
 #define APP_VER_MAJOR 0
-#define APP_VER_MINOR 25
+#define APP_VER_MINOR 26
 #define APP_VER_REV 0
-#define APP_VER_BUILD 1350
+#define APP_VER_BUILD 1370
 
 #define BUILD_COMMIT_ID "@VERSION@"
 #define PROJECT_VERSION STR(APP_VER_MAJOR) "." STR(APP_VER_MINOR) "." STR(APP_VER_REV)
