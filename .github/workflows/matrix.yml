@@ -241,9 +241,6 @@ jobs:
           path: clcache
           key: clcache-windows
 
-      - name: Install OpenSSL
-        run: choco install openssl
-
       # Configure project with cmake
       - name: Configure
         run: |
@@ -257,7 +254,7 @@ jobs:
           $env:CLCACHE_DIR = "$env:GITHUB_WORKSPACE\clcache"
           $env:PATH = "$env:PATH;$env:MSBUILD_PATH"
           cd build
-          MSBuild TurtleCoin.sln /p:CLToolExe=clcache.exe /p:CLToolPath=c:\hostedtoolcache\windows\Python\3.7.6\x64\Scripts\ /p:Configuration=Release /p:PlatformToolset=v141 /m
+          MSBuild TurtleCoin.sln /p:CLToolExe=clcache.exe /p:Configuration=Release /p:PlatformToolset=v141 /m
 
       # Test the crypto
       - name: Test Crypto
